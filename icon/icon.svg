@@ -1,0 +1,141 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0D0F1A"/>
+      <stop offset="100%" style="stop-color:#0A0D18"/>
+    </linearGradient>
+    <!-- Main glow gradient -->
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7C3AED"/>
+      <stop offset="50%" style="stop-color:#2563EB"/>
+      <stop offset="100%" style="stop-color:#06B6D4"/>
+    </linearGradient>
+    <!-- Secondary glow -->
+    <linearGradient id="glow2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7C3AED;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#06B6D4;stop-opacity:0.6"/>
+    </linearGradient>
+    <!-- Glow filter -->
+    <filter id="blur-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Strong glow filter -->
+    <filter id="strong-glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Dot glow -->
+    <filter id="dot-glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="rounded-rect">
+      <rect width="1024" height="1024" rx="230" ry="230"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+
+  <!-- Subtle hex grid pattern in background -->
+  <g opacity="0.04" clip-path="url(#rounded-rect)">
+    <!-- Horizontal grid lines -->
+    <line x1="0" y1="128" x2="1024" y2="128" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="0" y1="256" x2="1024" y2="256" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="0" y1="384" x2="1024" y2="384" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="0" y1="512" x2="1024" y2="512" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="0" y1="640" x2="1024" y2="640" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="0" y1="768" x2="1024" y2="768" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="0" y1="896" x2="1024" y2="896" stroke="#7C3AED" stroke-width="1"/>
+    <!-- Vertical grid lines -->
+    <line x1="128" y1="0" x2="128" y2="1024" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="256" y1="0" x2="256" y2="1024" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="384" y1="0" x2="384" y2="1024" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="512" y1="0" x2="512" y2="1024" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="640" y1="0" x2="640" y2="1024" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="768" y1="0" x2="768" y2="1024" stroke="#7C3AED" stroke-width="1"/>
+    <line x1="896" y1="0" x2="896" y2="1024" stroke="#7C3AED" stroke-width="1"/>
+  </g>
+
+  <!-- Background ambient glow -->
+  <ellipse cx="512" cy="480" rx="350" ry="320" fill="#4F46E5" opacity="0.08" filter="url(#strong-glow)"/>
+
+  <!-- Circuit trace: outer hexagon frame (faint) -->
+  <polygon points="512,120 780,270 780,570 512,720 244,570 244,270"
+    fill="none" stroke="url(#glow)" stroke-width="2" opacity="0.15"/>
+
+  <!-- Main A shape - circuit style -->
+  <!-- Left leg of A -->
+  <path d="M 300 820 L 440 220 L 512 200 L 584 220 L 724 820"
+    fill="none" stroke="url(#glow)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"
+    filter="url(#blur-glow)" opacity="0.9"/>
+
+  <!-- Crossbar of A -->
+  <line x1="362" y1="580" x2="662" y2="580"
+    stroke="url(#glow)" stroke-width="22" stroke-linecap="round"
+    filter="url(#blur-glow)" opacity="0.9"/>
+
+  <!-- Circuit branches on left leg -->
+  <line x1="340" y1="700" x2="240" y2="700" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  <line x1="240" y1="700" x2="240" y2="760" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Circuit branches on right leg -->
+  <line x1="684" y1="700" x2="784" y2="700" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  <line x1="784" y1="700" x2="784" y2="760" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Circuit branches at top -->
+  <line x1="512" y1="200" x2="512" y2="130" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  <line x1="512" y1="130" x2="560" y2="130" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  <line x1="512" y1="130" x2="464" y2="130" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Crossbar circuit branches -->
+  <line x1="512" y1="580" x2="512" y2="650" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  <line x1="512" y1="650" x2="560" y2="650" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  <line x1="512" y1="650" x2="464" y2="650" stroke="url(#glow2)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Glow nodes (dots at junctions) -->
+  <!-- Top apex -->
+  <circle cx="512" cy="200" r="14" fill="#7C3AED" filter="url(#dot-glow)"/>
+  <circle cx="512" cy="200" r="7" fill="#C4B5FD"/>
+
+  <!-- Crossbar left junction -->
+  <circle cx="362" cy="580" r="12" fill="#2563EB" filter="url(#dot-glow)"/>
+  <circle cx="362" cy="580" r="6" fill="#93C5FD"/>
+
+  <!-- Crossbar right junction -->
+  <circle cx="662" cy="580" r="12" fill="#2563EB" filter="url(#dot-glow)"/>
+  <circle cx="662" cy="580" r="6" fill="#93C5FD"/>
+
+  <!-- Crossbar center -->
+  <circle cx="512" cy="580" r="10" fill="#06B6D4" filter="url(#dot-glow)"/>
+  <circle cx="512" cy="580" r="5" fill="#A5F3FC"/>
+
+  <!-- Bottom left foot -->
+  <circle cx="300" cy="820" r="10" fill="#7C3AED" filter="url(#dot-glow)" opacity="0.8"/>
+
+  <!-- Bottom right foot -->
+  <circle cx="724" cy="820" r="10" fill="#7C3AED" filter="url(#dot-glow)" opacity="0.8"/>
+
+  <!-- Corner circuit dots -->
+  <circle cx="240" cy="760" r="6" fill="#06B6D4" opacity="0.7" filter="url(#dot-glow)"/>
+  <circle cx="784" cy="760" r="6" fill="#06B6D4" opacity="0.7" filter="url(#dot-glow)"/>
+  <circle cx="560" cy="130" r="5" fill="#7C3AED" opacity="0.7"/>
+  <circle cx="464" cy="130" r="5" fill="#7C3AED" opacity="0.7"/>
+  <circle cx="560" cy="650" r="5" fill="#06B6D4" opacity="0.7"/>
+  <circle cx="464" cy="650" r="5" fill="#06B6D4" opacity="0.7"/>
+
+  <!-- Border glow -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="none"
+    stroke="url(#glow)" stroke-width="3" opacity="0.3"/>
+</svg>

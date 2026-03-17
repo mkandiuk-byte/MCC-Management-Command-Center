@@ -1,65 +1,105 @@
-import Image from "next/image";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { FolderCode, Brain, Layers, Wrench, BookOpen, Terminal, GitFork } from "lucide-react"
+import Link from "next/link"
+import { DashboardStats } from "@/components/dashboard-stats"
+import { JiraDashboardStats } from "@/components/jira-dashboard-stats"
 
-export default function Home() {
+const quickLinks = [
+  {
+    title: "Workspace",
+    description: "Browse workspace files and project directories",
+    href: "/files/upstars",
+    icon: FolderCode,
+    badge: "repos",
+    color: "text-blue-400"
+  },
+  {
+    title: "CLAUDE Workspace",
+    description: "Skills, Tools, Instructions, MCP configs",
+    href: "/files/claude",
+    icon: Brain,
+    badge: "Config",
+    color: "text-purple-400"
+  },
+  {
+    title: "Skills",
+    description: "30+ Claude skills: infra, data, security, etc.",
+    href: "/claude/skills",
+    icon: Layers,
+    badge: "30+ skills",
+    color: "text-green-400"
+  },
+  {
+    title: "Tools",
+    description: "Architecture patterns, ML, AI, data science refs",
+    href: "/claude/tools",
+    icon: Wrench,
+    badge: "Tools",
+    color: "text-orange-400"
+  },
+  {
+    title: "Instructions",
+    description: "Root instructions and Graphiti config",
+    href: "/claude/instructions",
+    icon: BookOpen,
+    badge: "Docs",
+    color: "text-yellow-400"
+  },
+  {
+    title: "MCP Servers",
+    description: "Context7, Graphiti, n8n, GitHub, Atlassian, Figma",
+    href: "/claude/mcp",
+    icon: Terminal,
+    badge: "MCP",
+    color: "text-red-400"
+  },
+  {
+    title: "Repositories",
+    description: "Git repos: status, clone, pull, manage scan dirs",
+    href: "/repos",
+    icon: GitFork,
+    badge: "Git",
+    color: "text-cyan-400"
+  },
+]
+
+export default function HomePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex flex-col h-full">
+      <header className="flex items-center gap-2 px-6 py-4 border-b">
+        <SidebarTrigger />
+        <div className="flex-1">
+          <h1 className="text-xl font-semibold">AAP Panel</h1>
+          <p className="text-sm text-muted-foreground">Admin Panel & Claude Workspace</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <kbd className="hidden sm:flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+          <span>⌘</span>K
+        </kbd>
+      </header>
+      <div className="flex-1 p-6">
+        <DashboardStats />
+        <JiraDashboardStats />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {quickLinks.map((item) => (
+            <Link key={item.href} href={item.href}>
+              <Card className="h-full hover:bg-accent/50 transition-colors cursor-pointer">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <item.icon className={`h-6 w-6 ${item.color}`} />
+                    <Badge variant="secondary" className="text-xs">
+                      {item.badge}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-base mt-2">{item.title}</CardTitle>
+                  <CardDescription className="text-sm">{item.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
         </div>
-      </main>
+      </div>
     </div>
-  );
+  )
 }

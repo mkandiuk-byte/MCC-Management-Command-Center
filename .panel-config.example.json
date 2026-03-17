@@ -1,0 +1,14 @@
+{
+  "scanDirs": [
+    "/path/to/your/workspace"
+  ],
+  "jiraBoards": [
+    {
+      "id": "123",
+      "boardId": 123,
+      "projectKey": "PROJ",
+      "displayName": "My Board",
+      "url": "https://your-company.atlassian.net/jira/software/c/projects/PROJ/boards/123"
+    }
+  ]
+}
