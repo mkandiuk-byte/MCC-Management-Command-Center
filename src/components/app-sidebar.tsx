@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar"
 import {
   FolderCode, Brain, Home, Settings,
-  Wrench, BookOpen, Layers, Terminal, SquareTerminal, Search, GitFork, Kanban
+  Wrench, BookOpen, Layers, Terminal, SquareTerminal, Search, GitFork, Kanban, Map
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -37,10 +37,11 @@ const navItems = [
   {
     group: "File Explorer",
     items: [
-      { title: "Workspace", href: "/files/upstars", icon: FolderCode },
+      { title: "Upstars / soft", href: "/files/upstars", icon: FolderCode },
       { title: "CLAUDE Workspace", href: "/files/claude", icon: Brain },
       { title: "Search", href: "/search", icon: Search },
       { title: "Repositories", href: "/repos", icon: GitFork },
+      { title: "Service Map", href: "/repos/map", icon: Map },
     ]
   },
   {
