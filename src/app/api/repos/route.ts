@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { execSync } from 'child_process'
 import { simpleGit } from 'simple-git'
 
 const CONFIG_PATH = path.join(process.cwd(), '.panel-config.json')
@@ -28,7 +29,25 @@ interface RepoInfo {
   isDirty: boolean
   hasRemote: boolean
   scanDir: string
+  diskSizeKb: number
+  githubOwner: string
+  githubRepo: string
   error?: string
+}
+
+function parseGitRemoteUrl(remoteUrl: string): { owner: string; repo: string } {
+  const trimmed = remoteUrl.trim()
+  // SSH: git@github.com:owner/repo.git
+  const sshMatch = trimmed.match(/git@github\.com[:/]([^/]+)\/(.+?)(?:\.git)?$/)
+  if (sshMatch) {
+    return { owner: sshMatch[1], repo: sshMatch[2] }
+  }
+  // HTTPS: https://github.com/owner/repo.git
+  const httpsMatch = trimmed.match(/https?:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/)
+  if (httpsMatch) {
+    return { owner: httpsMatch[1], repo: httpsMatch[2] }
+  }
+  return { owner: '', repo: '' }
 }
 
 async function getRepoInfo(dirPath: string, name: string, scanDir: string): Promise<RepoInfo> {
@@ -45,6 +64,17 @@ async function getRepoInfo(dirPath: string, name: string, scanDir: string): Prom
     isDirty: false,
     hasRemote: false,
     scanDir,
+    diskSizeKb: 0,
+    githubOwner: '',
+    githubRepo: '',
+  }
+
+  // Disk size
+  try {
+    const duOutput = execSync(`du -sk "${dirPath}"`, { timeout: 5000 }).toString()
+    base.diskSizeKb = parseInt(duOutput.split('\t')[0]) || 0
+  } catch {
+    base.diskSizeKb = 0
   }
 
   try {
@@ -64,6 +94,17 @@ async function getRepoInfo(dirPath: string, name: string, scanDir: string): Prom
     base.hasRemote = remotes.length > 0
 
     if (base.hasRemote) {
+      try {
+        const remoteUrl = await git.remote(['get-url', 'origin'])
+        if (remoteUrl) {
+          const { owner, repo } = parseGitRemoteUrl(remoteUrl)
+          base.githubOwner = owner
+          base.githubRepo = repo
+        }
+      } catch {
+        // remote URL might not be available
+      }
+
       try {
         const status = await git.status()
         base.ahead = status.ahead
