@@ -117,7 +117,7 @@ export function ServiceMap({ repos }: ServiceMapProps) {
         data={treeData}
         dataKey="size"
         aspectRatio={4 / 3}
-        content={<CustomCell />}
+        content={(props: any) => <CustomCell {...props} />}
       >
         <Tooltip content={<CustomTooltip />} />
       </Treemap>

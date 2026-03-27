@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import os from 'os'
 import { randomUUID } from 'crypto'
+import { createRequire } from 'module'
 import { ptyStore } from '../pty-store.js'
+
+const require = createRequire(import.meta.url)
 
 const CLAUDE_WORKSPACE = process.env.CLAUDE_PATH ?? ''
 const HOME = os.homedir()
