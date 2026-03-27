@@ -15,55 +15,62 @@ import {
 } from "@/components/ui/sidebar"
 import {
   FolderCode, Brain, Home, Settings,
-  Wrench, BookOpen, Layers, Terminal, SquareTerminal, Search, GitFork, Kanban, Map
+  Wrench, BookOpen, Layers, Terminal, SquareTerminal, Search, GitFork, Kanban, Map, TrendingUp
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { LanguageSwitcher } from "@/components/language-switcher"
+import { useLanguage, type TranslationKey } from "@/lib/i18n"
 
-const navItems = [
+const navItems: {
+  groupKey: TranslationKey
+  items: { titleKey: TranslationKey; href: string; icon: React.ElementType }[]
+}[] = [
   {
-    group: "Overview",
+    groupKey: "nav.overview",
     items: [
-      { title: "Dashboard", href: "/", icon: Home },
-    ]
+      { titleKey: "nav.main", href: "/", icon: Home },
+    ],
   },
   {
-    group: "Project Management",
+    groupKey: "nav.project_management",
     items: [
-      { title: "Jira Boards", href: "/jira", icon: Kanban },
-    ]
+      { titleKey: "nav.jira_boards", href: "/jira", icon: Kanban },
+      { titleKey: "nav.keitaro", href: "/keitaro", icon: TrendingUp },
+    ],
   },
   {
-    group: "File Explorer",
+    groupKey: "nav.file_explorer",
     items: [
-      { title: "Upstars / soft", href: "/files/upstars", icon: FolderCode },
-      { title: "CLAUDE Workspace", href: "/files/claude", icon: Brain },
-      { title: "Search", href: "/search", icon: Search },
-      { title: "Repositories", href: "/repos", icon: GitFork },
-      { title: "Service Map", href: "/repos/map", icon: Map },
-    ]
+      { titleKey: "nav.upstars", href: "/files/upstars", icon: FolderCode },
+      { titleKey: "nav.claude_workspace", href: "/files/claude", icon: Brain },
+      { titleKey: "nav.search", href: "/search", icon: Search },
+      { titleKey: "nav.repositories", href: "/repos", icon: GitFork },
+      { titleKey: "nav.service_map", href: "/repos/map", icon: Map },
+    ],
   },
   {
-    group: "Claude Config",
+    groupKey: "nav.claude_config",
     items: [
-      { title: "Skills", href: "/claude/skills", icon: Layers },
-      { title: "Tools", href: "/claude/tools", icon: Wrench },
-      { title: "Instructions", href: "/claude/instructions", icon: BookOpen },
-      { title: "MCP Servers", href: "/claude/mcp", icon: Terminal },
-      { title: "Claude Terminal", href: "/claude/terminal", icon: SquareTerminal },
-    ]
+      { titleKey: "nav.skills", href: "/claude/skills", icon: Layers },
+      { titleKey: "nav.tools", href: "/claude/tools", icon: Wrench },
+      { titleKey: "nav.instructions", href: "/claude/instructions", icon: BookOpen },
+      { titleKey: "nav.mcp_servers", href: "/claude/mcp", icon: Terminal },
+      { titleKey: "nav.claude_terminal", href: "/claude/terminal", icon: SquareTerminal },
+    ],
   },
   {
-    group: "System",
+    groupKey: "nav.system",
     items: [
-      { title: "Settings", href: "/settings", icon: Settings },
-    ]
-  }
+      { titleKey: "nav.settings", href: "/settings", icon: Settings },
+    ],
+  },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { t } = useLanguage()
 
   return (
     <Sidebar collapsible="icon">
@@ -77,8 +84,8 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {navItems.map((section) => (
-          <SidebarGroup key={section.group}>
-            <SidebarGroupLabel>{section.group}</SidebarGroupLabel>
+          <SidebarGroup key={section.groupKey}>
+            <SidebarGroupLabel>{t(section.groupKey)}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((item) => (
@@ -86,10 +93,10 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       render={<Link href={item.href} />}
                       isActive={pathname === item.href}
-                      tooltip={item.title}
+                      tooltip={t(item.titleKey)}
                     >
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span>{t(item.titleKey)}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -103,7 +110,8 @@ export function AppSidebar() {
           <span className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
             AAP Panel
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5 group-data-[collapsible=icon]:hidden">
+            <LanguageSwitcher />
             <ThemeToggle />
           </div>
         </div>
