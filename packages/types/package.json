@@ -1,0 +1,17 @@
+{
+  "name": "@aap/types",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./keitaro": "./src/keitaro.ts",
+    "./jira": "./src/jira.ts",
+    "./repos": "./src/repos.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
