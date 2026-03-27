@@ -1,6 +1,7 @@
 'use client'
 
-import { Treemap, ResponsiveContainer, Tooltip } from 'recharts'
+import { useRef, useState, useEffect } from 'react'
+import { Treemap, Tooltip } from 'recharts'
 
 interface Repo {
   name: string
@@ -98,6 +99,18 @@ function CustomTooltip({ active, payload }: any) {
 }
 
 export function ServiceMap({ repos }: ServiceMapProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    setWidth(el.clientWidth)
+    const obs = new ResizeObserver(() => setWidth(el.clientWidth))
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
   const treeData = repos
     .filter(r => r.diskSizeKb > 0)
     .map(r => ({ ...r, size: Math.max(r.diskSizeKb, 200) }))
@@ -112,15 +125,19 @@ export function ServiceMap({ repos }: ServiceMapProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={600}>
-      <Treemap
-        data={treeData}
-        dataKey="size"
-        aspectRatio={4 / 3}
-        content={(props: any) => <CustomCell {...props} />}
-      >
-        <Tooltip content={<CustomTooltip />} />
-      </Treemap>
-    </ResponsiveContainer>
+    <div ref={containerRef} style={{ width: '100%', height: 600 }}>
+      {width > 0 && (
+        <Treemap
+          width={width}
+          height={600}
+          data={treeData}
+          dataKey="size"
+          aspectRatio={4 / 3}
+          content={(props: any) => <CustomCell {...props} />}
+        >
+          <Tooltip content={<CustomTooltip />} />
+        </Treemap>
+      )}
+    </div>
   )
 }
