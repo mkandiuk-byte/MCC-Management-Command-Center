@@ -12,6 +12,8 @@ interface RepoFromAPI {
   diskSizeKb: number
   githubOwner: string
   githubRepo: string
+  owner: string
+  repo: string
   branch: string
   lastCommitDate: string
   isDirty: boolean
@@ -38,10 +40,13 @@ export default async function RepoDetailPage({
     // repo stays null
   }
 
-  if (repo?.githubOwner && repo?.githubRepo) {
+  const ghOwner = repo?.githubOwner || repo?.owner || ''
+  const ghRepo = repo?.githubRepo || repo?.repo || ''
+
+  if (ghOwner && ghRepo) {
     try {
       const statsRes = await fetch(
-        `${BASE}/api/github/repo-stats?owner=${repo.githubOwner}&repo=${repo.githubRepo}`,
+        `${BASE}/api/github/repo-stats?owner=${ghOwner}&repo=${ghRepo}`,
         { cache: 'no-store' }
       )
       stats = await statsRes.json()
@@ -79,8 +84,8 @@ export default async function RepoDetailPage({
         </Link>
         <h1 className="text-2xl font-bold">{name}</h1>
         {repo && <Badge variant="outline">{repo.branch}</Badge>}
-        {repo?.githubOwner && (
-          <Badge variant="secondary">{repo.githubOwner}</Badge>
+        {ghOwner && (
+          <Badge variant="secondary">{ghOwner}</Badge>
         )}
         {repo?.isDirty && (
           <Badge variant="destructive">Uncommitted changes</Badge>
@@ -200,16 +205,16 @@ export default async function RepoDetailPage({
                 <span className="font-medium">{formatAgo(repo.lastCommitDate)}</span>
               </div>
             )}
-            {repo.githubOwner && repo.githubRepo && (
+            {ghOwner && ghRepo && (
               <div>
                 <span className="text-muted-foreground">GitHub: </span>
                 <a
-                  href={`https://github.com/${repo.githubOwner}/${repo.githubRepo}`}
+                  href={`https://github.com/${ghOwner}/${ghRepo}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium text-indigo-400 hover:underline"
                 >
-                  {repo.githubOwner}/{repo.githubRepo}
+                  {ghOwner}/{ghRepo}
                 </a>
               </div>
             )}
@@ -224,12 +229,7 @@ export default async function RepoDetailPage({
       {!stats && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            No GitHub data available for this repository.
-            {!repo?.githubOwner && (
-              <p className="text-xs mt-2">
-                githubOwner / githubRepo fields are missing from the API response.
-              </p>
-            )}
+            No GitHub stats available for this repository.
           </CardContent>
         </Card>
       )}
