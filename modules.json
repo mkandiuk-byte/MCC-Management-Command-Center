@@ -1,0 +1,66 @@
+[
+  {
+    "id": "dashboard",
+    "label": "Dashboard",
+    "href": "/",
+    "icon": "LayoutDashboard",
+    "service": null,
+    "alwaysVisible": true
+  },
+  {
+    "id": "keitaro",
+    "label": "Keitaro",
+    "href": "/keitaro",
+    "icon": "BarChart3",
+    "service": "http://127.0.0.1:3801/health",
+    "alwaysVisible": false
+  },
+  {
+    "id": "jira",
+    "label": "Jira",
+    "href": "/jira",
+    "icon": "ListTodo",
+    "service": "http://127.0.0.1:3802/health",
+    "alwaysVisible": false
+  },
+  {
+    "id": "repos",
+    "label": "Repos",
+    "href": "/repos",
+    "icon": "GitBranch",
+    "service": "http://127.0.0.1:3803/health",
+    "alwaysVisible": false
+  },
+  {
+    "id": "terminal",
+    "label": "Terminal",
+    "href": "/terminal",
+    "icon": "Terminal",
+    "service": "http://127.0.0.1:3803/health",
+    "alwaysVisible": false
+  },
+  {
+    "id": "files",
+    "label": "Files",
+    "href": "/files",
+    "icon": "Folder",
+    "service": "http://127.0.0.1:3803/health",
+    "alwaysVisible": false
+  },
+  {
+    "id": "claude",
+    "label": "Claude",
+    "href": "/claude",
+    "icon": "Bot",
+    "service": "http://127.0.0.1:3804/health",
+    "alwaysVisible": false
+  },
+  {
+    "id": "logs",
+    "label": "Logs",
+    "href": "/logs",
+    "icon": "ScrollText",
+    "service": "http://127.0.0.1:3803/health",
+    "alwaysVisible": false
+  }
+]

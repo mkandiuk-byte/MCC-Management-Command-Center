@@ -5,6 +5,7 @@ import { FolderCode, Brain, Layers, Wrench, BookOpen, Terminal, GitFork } from "
 import Link from "next/link"
 import { DashboardStats } from "@/components/dashboard-stats"
 import { JiraDashboardStats } from "@/components/jira-dashboard-stats"
+import { KeitaroDashboardStats } from "@/components/keitaro-dashboard-stats"
 
 const quickLinks = [
   {
@@ -81,6 +82,7 @@ export default function HomePage() {
       <div className="flex-1 p-6">
         <DashboardStats />
         <JiraDashboardStats />
+        <KeitaroDashboardStats />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickLinks.map((item) => (
             <Link key={item.href} href={item.href}>

@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Kanban, ExternalLink, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import type { BoardStats } from "@/app/api/jira/stats/route"
+import type { BoardStats } from "@aap/types"
 
 interface StatsResponse {
   boards: BoardStats[]
@@ -105,13 +105,19 @@ export function JiraDashboardStats() {
       .then(r => r.json())
       .then((d: StatsResponse) => {
         setData(d)
-        if (d?.boards) {
+        if (d?.boards && 'setAppBadge' in navigator) {
           const prCount = d.boards.reduce((sum, b) => sum + b.draft + b.open + b.merged + b.closed, 0)
-          if ('setAppBadge' in navigator) {
-            prCount > 0
-              ? navigator.setAppBadge(prCount).catch(() => {})
-              : navigator.clearAppBadge?.().catch(() => {})
+          // Only clear badge if GitHub data looks valid (not all-zero due to rate limiting).
+          // If every board with issues shows 0 PRs found, GitHub search likely failed — keep stale badge.
+          const totalIssues = d.boards.reduce((s, b) => s + b.total, 0)
+          const githubDataValid = prCount > 0 || totalIssues === 0 ||
+            d.boards.some(b => b.error)
+          if (prCount > 0) {
+            navigator.setAppBadge(prCount).catch(() => {})
+          } else if (githubDataValid) {
+            navigator.clearAppBadge?.().catch(() => {})
           }
+          // else: totalIssues > 0 but prCount = 0 and no errors → rate-limited, keep current badge
         }
       })
       .catch(() => {})

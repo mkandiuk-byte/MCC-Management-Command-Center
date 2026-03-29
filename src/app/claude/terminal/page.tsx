@@ -64,7 +64,7 @@ export default function ClaudeTerminalPage() {
   }, [])
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col" style={{ height: '100vh' }}>
       <header className="flex items-center gap-2 px-6 py-4 border-b shrink-0">
         <SidebarTrigger />
         <div>
@@ -72,8 +72,19 @@ export default function ClaudeTerminalPage() {
           <p className="text-sm text-muted-foreground">Interactive Claude session with workspace context</p>
         </div>
       </header>
-      <div className="flex-1 overflow-hidden">
-        {ready && <ClaudeTerminal autoStart context={context} />}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {ready
+          ? <ClaudeTerminal autoStart context={context} />
+          : (
+            <div className="flex items-center justify-center h-full gap-2 text-muted-foreground text-sm">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              Loading workspace context...
+            </div>
+          )
+        }
       </div>
     </div>
   )

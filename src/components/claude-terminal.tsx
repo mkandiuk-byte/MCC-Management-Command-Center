@@ -234,7 +234,7 @@ export function ClaudeTerminal({ autoStart = true, context }: ClaudeTerminalProp
   }[status]
 
   return (
-    <div className={`flex flex-col ${fullscreen ? 'fixed inset-0 z-50 bg-background' : 'h-full'}`}>
+    <div className={`flex flex-col ${fullscreen ? 'fixed inset-0 z-50 bg-background' : 'h-full min-h-0'}`}>
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-card shrink-0">
         <Terminal className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Claude Terminal</span>

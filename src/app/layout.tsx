@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { CommandPalette } from "@/components/command-palette"
 import { Toaster } from "@/components/ui/sonner"
+import { LanguageProvider } from "@/lib/i18n"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +45,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#0a0a0a" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <LanguageProvider>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -61,6 +63,7 @@ export default function RootLayout({
             <Toaster />
           </TooltipProvider>
         </ThemeProvider>
+        </LanguageProvider>
       </body>
     </html>
   )
