@@ -1,8 +1,10 @@
 #!/bin/bash
-set -e
-PANEL_DIR="/Users/kosenko/Desktop/AAP_pannel"
-NEXT_BIN="$PANEL_DIR/node_modules/.pnpm/next@16.1.6_@babel+core@7.29.0_react-dom@19.2.3_react@19.2.3__react@19.2.3/node_modules/next/dist/bin/next"
-
-cd "$PANEL_DIR"
-node "$NEXT_BIN" build
-exec node "$NEXT_BIN" start -p 3777
+# Kill anything on port 3777 before starting (prevents EADDRINUSE → .next/static wipe bug)
+PORT_PID=$(lsof -ti:3777 2>/dev/null)
+if [ -n "$PORT_PID" ]; then
+  echo "[start-shell] Killing stale process on :3777 (PID $PORT_PID)"
+  kill -9 $PORT_PID 2>/dev/null
+  sleep 1
+fi
+cd "$(dirname "$0")"
+exec node_modules/.bin/next start -p 3777

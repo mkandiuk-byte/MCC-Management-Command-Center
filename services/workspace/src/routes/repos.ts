@@ -120,8 +120,15 @@ export async function reposRoutes(app: FastifyInstance) {
     const destPath = path.join(resolvedTarget, repoName)
     if (fs.existsSync(destPath)) return reply.status(400).send({ error: `Directory already exists: ${destPath}` })
 
+    // Convert GitHub HTTPS → SSH so private repos use the configured SSH key
+    const cloneUrl = url.replace(/^https:\/\/github\.com\//, 'git@github.com:').replace(/(?<!\.git)$/, '.git')
+
     try {
-      execSync(`git clone ${JSON.stringify(url)} ${JSON.stringify(destPath)}`, { stdio: 'pipe', timeout: 120000 })
+      execSync(`git clone ${JSON.stringify(cloneUrl)} ${JSON.stringify(destPath)}`, {
+        stdio: 'pipe',
+        timeout: 120000,
+        env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${process.env.HOME}/.ssh/id_ed25519 -o StrictHostKeyChecking=no` },
+      })
     } catch (e: unknown) {
       return reply.status(500).send({ error: `Clone failed: ${e instanceof Error ? e.message : String(e)}` })
     }
