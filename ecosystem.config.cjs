@@ -45,16 +45,16 @@ module.exports = {
     {
       name: 'aap-shell',
       cwd: ROOT,
-      script: 'node_modules/.bin/next',
-      args: 'start -p 3777',
-      interpreter: 'none',
+      script: 'start-shell.sh',
+      interpreter: 'bash',
 
       env: { ...SHARED_ENV, PORT: '3777' },
       error_file: `${process.env.HOME}/Library/Logs/aap-panel-error.log`,
       out_file: `${process.env.HOME}/Library/Logs/aap-panel.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      restart_delay: 3000,
-      max_restarts: 5,
+      kill_timeout: 10000,
+      restart_delay: 5000,
+      max_restarts: 3,
     },
 
     // ── Keitaro analytics service (port 3801) ─────────────────────────
