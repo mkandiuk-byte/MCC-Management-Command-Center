@@ -14,6 +14,9 @@ function getOrgs() {
 const prCache = new Map<string, { data: Map<string, PRInfo>; expiresAt: number }>()
 const CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
+// In-flight deduplication: prevent parallel fetches for identical key sets
+const inFlight = new Map<string, Promise<Map<string, PRInfo>>>()
+
 // Rate-limit backoff: skip all requests until this timestamp
 let rateLimitedUntil = 0
 
@@ -109,22 +112,8 @@ async function searchBatch(q: string): Promise<GitHubSearchItem[]> {
   }
 }
 
-// Search GitHub PRs for a list of issue keys (e.g. ["ASD-101", "ASD-102"])
-// Returns a map: issueKey → PRInfo (best status wins when multiple PRs exist)
-// Pass 1: title/body search in batches of 6
-// Pass 2: for keys still unmatched, individual branch (head:KEY) searches
-export async function searchPRsForIssues(
-  issueKeys: string[]
-): Promise<Map<string, PRInfo>> {
-  const token = process.env.GITHUB_TOKEN
-  if (!issueKeys.length || !token) return new Map()
-
-  const cacheKey = getCacheKey(issueKeys)
-  const cached = prCache.get(cacheKey)
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data
-  }
-
+// Inner fetch — called only when cache miss and no in-flight request
+async function _doFetch(issueKeys: string[], cacheKey: string): Promise<Map<string, PRInfo>> {
   const result = new Map<string, PRInfo>()
   const orgQuery = getOrgs().map(o => `org:${o}`).join(' ')
 
@@ -147,22 +136,52 @@ export async function searchPRsForIssues(
     }
   }
 
-  // ── Pass 2: branch-name search for still-unmatched keys ──
+  // ── Pass 2: branch-name search for still-unmatched keys (max 3 concurrent) ──
   const unmatched = issueKeys.filter(k => !result.has(k))
 
   if (unmatched.length > 0) {
-    // Run individual branch searches in parallel (one query per key)
-    await Promise.all(
-      unmatched.map(async (key) => {
-        const q = `is:pr head:${key} ${orgQuery}`
-        const items = await searchBatch(q)
-        for (const item of items) {
-          applyResult(result, key, item, itemToStatus(item))
-        }
-      })
-    )
+    const CONCURRENCY = 3
+    for (let i = 0; i < unmatched.length; i += CONCURRENCY) {
+      await Promise.all(
+        unmatched.slice(i, i + CONCURRENCY).map(async (key) => {
+          const q = `is:pr head:${key} ${orgQuery}`
+          const items = await searchBatch(q)
+          for (const item of items) {
+            applyResult(result, key, item, itemToStatus(item))
+          }
+        })
+      )
+    }
   }
 
   prCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS })
+  inFlight.delete(cacheKey)
   return result
+}
+
+// Search GitHub PRs for a list of issue keys (e.g. ["ASD-101", "ASD-102"])
+// Returns a map: issueKey → PRInfo (best status wins when multiple PRs exist)
+// Pass 1: title/body search in batches of 6
+// Pass 2: for keys still unmatched, individual branch (head:KEY) searches
+export async function searchPRsForIssues(
+  issueKeys: string[]
+): Promise<Map<string, PRInfo>> {
+  const token = process.env.GITHUB_TOKEN
+  if (!issueKeys.length || !token) return new Map()
+
+  const cacheKey = getCacheKey(issueKeys)
+
+  // Cache hit
+  const cached = prCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data
+  }
+
+  // In-flight deduplication: reuse existing promise if fetch already in progress
+  const pending = inFlight.get(cacheKey)
+  if (pending) return pending
+
+  const promise = _doFetch(issueKeys, cacheKey)
+  inFlight.set(cacheKey, promise)
+  return promise
 }

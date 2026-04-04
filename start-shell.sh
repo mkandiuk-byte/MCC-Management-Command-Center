@@ -1,8 +1,13 @@
 #!/bin/bash
-set -e
-PANEL_DIR="/Users/kosenko/Desktop/AAP_pannel"
-NEXT_BIN="$PANEL_DIR/node_modules/.pnpm/next@16.1.6_@babel+core@7.29.0_react-dom@19.2.3_react@19.2.3__react@19.2.3/node_modules/next/dist/bin/next"
+PORT="${PORT:-3777}"
 
-cd "$PANEL_DIR"
-node "$NEXT_BIN" build
-exec node "$NEXT_BIN" start -p 3777
+# Kill anything on the target port before starting (prevents EADDRINUSE on local dev)
+# lsof may not be available in Docker/Linux — skip silently if absent
+if command -v lsof > /dev/null 2>&1; then
+  echo "[start-shell] Clearing port ${PORT}..."
+  lsof -ti:"${PORT}" 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+  sleep 1
+fi
+
+cd "$(dirname "$0")"
+exec node_modules/.bin/next start -p "${PORT}"

@@ -33,10 +33,11 @@ const dotenv = loadEnvFile(`${ROOT}/.env.local`)
 
 const SHARED_ENV = {
   NODE_ENV: process.env.NODE_ENV || 'production',
-  ...dotenv,
+  ...dotenv,          // .env.local values (local dev)
+  ...process.env,     // system / Docker env vars override .env.local
   PANEL_ROOT: ROOT,
   PANEL_CONFIG_PATH: `${ROOT}/.panel-config.json`,
-  PANEL_ORIGIN: 'http://localhost:3777',
+  PANEL_ORIGIN: process.env.PANEL_ORIGIN || dotenv.PANEL_ORIGIN || 'http://localhost:3777',
 }
 
 module.exports = {
@@ -45,16 +46,16 @@ module.exports = {
     {
       name: 'aap-shell',
       cwd: ROOT,
-      script: 'node_modules/.bin/next',
-      args: 'start -p 3777',
-      interpreter: 'none',
+      script: 'start-shell.sh',
+      interpreter: 'bash',
 
       env: { ...SHARED_ENV, PORT: '3777' },
-      error_file: `${process.env.HOME}/Library/Logs/aap-panel-error.log`,
-      out_file: `${process.env.HOME}/Library/Logs/aap-panel.log`,
+      error_file: `${ROOT}/logs/aap-panel-error.log`,
+      out_file: `${ROOT}/logs/aap-panel.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      restart_delay: 3000,
-      max_restarts: 5,
+      kill_timeout: 10000,
+      restart_delay: 5000,
+      max_restarts: 3,
     },
 
     // ── Keitaro analytics service (port 3801) ─────────────────────────
@@ -65,8 +66,8 @@ module.exports = {
       interpreter: `${ROOT}/services/keitaro/node_modules/.bin/tsx`,
 
       env: { ...SHARED_ENV, PORT: '3801' },
-      error_file: `${process.env.HOME}/Library/Logs/aap-keitaro-error.log`,
-      out_file: `${process.env.HOME}/Library/Logs/aap-keitaro.log`,
+      error_file: `${ROOT}/logs/aap-keitaro-error.log`,
+      out_file: `${ROOT}/logs/aap-keitaro.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       restart_delay: 3000,
       max_restarts: 5,
@@ -80,8 +81,8 @@ module.exports = {
       interpreter: `${ROOT}/services/jira/node_modules/.bin/tsx`,
 
       env: { ...SHARED_ENV, PORT: '3802' },
-      error_file: `${process.env.HOME}/Library/Logs/aap-jira-error.log`,
-      out_file: `${process.env.HOME}/Library/Logs/aap-jira.log`,
+      error_file: `${ROOT}/logs/aap-jira-error.log`,
+      out_file: `${ROOT}/logs/aap-jira.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       restart_delay: 3000,
       max_restarts: 5,
@@ -95,8 +96,8 @@ module.exports = {
       interpreter: `${ROOT}/services/workspace/node_modules/.bin/tsx`,
 
       env: { ...SHARED_ENV, PORT: '3803' },
-      error_file: `${process.env.HOME}/Library/Logs/aap-workspace-error.log`,
-      out_file: `${process.env.HOME}/Library/Logs/aap-workspace.log`,
+      error_file: `${ROOT}/logs/aap-workspace-error.log`,
+      out_file: `${ROOT}/logs/aap-workspace.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       restart_delay: 3000,
       max_restarts: 10,
@@ -111,8 +112,38 @@ module.exports = {
       interpreter: `${ROOT}/services/claude/node_modules/.bin/tsx`,
 
       env: { ...SHARED_ENV, PORT: '3804' },
-      error_file: `${process.env.HOME}/Library/Logs/aap-claude-error.log`,
-      out_file: `${process.env.HOME}/Library/Logs/aap-claude.log`,
+      error_file: `${ROOT}/logs/aap-claude-error.log`,
+      out_file: `${ROOT}/logs/aap-claude.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      restart_delay: 3000,
+      max_restarts: 5,
+    },
+
+    // ── Analytics service — PG-based (port 3806) ─────────────────────────
+    {
+      name: 'aap-analytics',
+      cwd: `${ROOT}/services/analytics`,
+      script: 'src/index.ts',
+      interpreter: `${ROOT}/services/analytics/node_modules/.bin/tsx`,
+
+      env: { ...SHARED_ENV, PORT: '3806' },
+      error_file: `${ROOT}/logs/aap-analytics-error.log`,
+      out_file: `${ROOT}/logs/aap-analytics.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      restart_delay: 3000,
+      max_restarts: 5,
+    },
+
+    // ── Graph visualization service (port 3805) ───────────────────────
+    {
+      name: 'aap-graph',
+      cwd: `${ROOT}/services/graph`,
+      script: 'src/index.ts',
+      interpreter: `${ROOT}/services/graph/node_modules/.bin/tsx`,
+
+      env: { ...SHARED_ENV, PORT: '3805' },
+      error_file: `${ROOT}/logs/aap-graph-error.log`,
+      out_file: `${ROOT}/logs/aap-graph.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       restart_delay: 3000,
       max_restarts: 5,
