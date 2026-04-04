@@ -1,13 +1,10 @@
 import Redis from 'ioredis'
 
-export const redis = new Redis({
-  host: process.env.REDIS_HOST ?? '127.0.0.1',
-  port: Number(process.env.REDIS_PORT ?? 6379),
-  lazyConnect: true,
-  maxRetriesPerRequest: 1,
-  enableOfflineQueue: false,
-  connectTimeout: 2000,
-})
+const REDIS_OPTS = { lazyConnect: true, maxRetriesPerRequest: 1, enableOfflineQueue: false, connectTimeout: 2000 } as const
+
+export const redis = process.env.REDIS_URL
+  ? new Redis(process.env.REDIS_URL, REDIS_OPTS)
+  : new Redis({ ...REDIS_OPTS, host: process.env.REDIS_HOST ?? '127.0.0.1', port: Number(process.env.REDIS_PORT ?? 6379) })
 
 redis.on('error', (err) => {
   // Silent — fallback to in-memory happens in each route
