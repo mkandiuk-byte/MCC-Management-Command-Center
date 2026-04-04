@@ -49,7 +49,7 @@ module.exports = {
       script: 'start-shell.sh',
       interpreter: 'bash',
 
-      env: { ...SHARED_ENV, PORT: '3777' },
+      env: { ...SHARED_ENV, PORT: process.env.PORT || '3777' },
       error_file: `${ROOT}/logs/aap-panel-error.log`,
       out_file: `${ROOT}/logs/aap-panel.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
