@@ -1,0 +1,37 @@
+# ── Dependencies (rebuilt inside Docker) ──────────────────────────────────────
+node_modules
+packages/*/node_modules
+services/*/node_modules
+
+# ── Next.js build artifacts (rebuilt inside Docker) ───────────────────────────
+.next
+out
+
+# ── Git / IDE ──────────────────────────────────────────────────────────────────
+.git
+.gitignore
+.idea
+*.iml
+
+# ── Local secrets — NEVER bake into the image ────────────────────────────────
+.env.local
+.env.production
+.env*.local
+
+# ── Test artifacts ────────────────────────────────────────────────────────────
+test-results
+playwright-report
+coverage
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs
+*.log
+
+# ── macOS junk ────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.md
+!README.md
+.npmrc-temp
+PG_REIMPLEMENTATION_PLAN.md
