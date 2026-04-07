@@ -12,6 +12,8 @@ const SERVICE_PORTS: Record<string, number> = {
   jira:      3802,
   workspace: 3803,
   claude:    3804,
+  graph:     3805,
+  analytics: 3806,
 }
 
 export function serviceUrl(name: keyof typeof SERVICE_PORTS): string {
