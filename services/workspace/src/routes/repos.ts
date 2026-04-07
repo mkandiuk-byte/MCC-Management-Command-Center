@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import fs from 'fs'
 import path from 'path'
-import { execSync } from 'child_process'
-import { simpleGit } from 'simple-git'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
 
 const CONFIG_PATH = process.env.PANEL_CONFIG_PATH
   ?? path.join(process.env.PANEL_ROOT ?? process.cwd(), '.panel-config.json')
@@ -34,6 +36,11 @@ interface RepoInfo {
   error?: string
 }
 
+async function run(cmd: string, cwd: string): Promise<string> {
+  const { stdout } = await execAsync(cmd, { cwd, timeout: 5000 })
+  return stdout.trim()
+}
+
 async function getRepoInfo(dirPath: string, name: string, scanDir: string): Promise<RepoInfo> {
   const base: RepoInfo = {
     id: `${scanDir}:${name}`, name, path: dirPath, branch: 'unknown',
@@ -42,42 +49,35 @@ async function getRepoInfo(dirPath: string, name: string, scanDir: string): Prom
     scanDir, diskSizeKb: 0, githubOwner: '', githubRepo: '',
   }
 
-  try {
-    const du = execSync(`du -sk "${dirPath}"`, { timeout: 5000 }).toString()
-    base.diskSizeKb = parseInt(du.split('\t')[0]) || 0
-  } catch { /* ignore */ }
+  // Run all commands in parallel
+  const [branchRes, logRes, remotesRes, urlRes, statusRes, duRes] = await Promise.allSettled([
+    run('git rev-parse --abbrev-ref HEAD', dirPath),
+    run('git log -1 --format=%h%x1f%s%x1f%ci', dirPath),
+    run('git remote', dirPath),
+    run('git remote get-url origin', dirPath),
+    run('git status --porcelain -b', dirPath),
+    execAsync(`du -sk "${dirPath}"`, { timeout: 5000 }).then(r => r.stdout.trim()),
+  ])
 
-  try {
-    const git = simpleGit(dirPath)
-    const branch = await git.branchLocal()
-    base.branch = branch.current || 'unknown'
-
-    const log = await git.log({ maxCount: 1 })
-    if (log.latest) {
-      base.lastCommitHash = log.latest.hash.slice(0, 7)
-      base.lastCommitMessage = log.latest.message.slice(0, 60)
-      base.lastCommitDate = log.latest.date
-    }
-
-    const remotes = await git.getRemotes(false)
-    base.hasRemote = remotes.length > 0
-
-    if (base.hasRemote) {
-      try {
-        const url = await git.remote(['get-url', 'origin'])
-        if (url) Object.assign(base, parseGitRemoteUrl(url))
-      } catch { /* ignore */ }
-
-      try {
-        const status = await git.status()
-        base.ahead = status.ahead
-        base.behind = status.behind
-        base.isDirty = !status.isClean()
-      } catch { /* remote unreachable */ }
-    }
-  } catch (e: unknown) {
-    return { ...base, error: (e instanceof Error ? e.message : String(e)).slice(0, 100) }
+  if (branchRes.status === 'fulfilled') base.branch = branchRes.value
+  if (logRes.status === 'fulfilled') {
+    const [hash, msg, date] = logRes.value.split('\x1f')
+    base.lastCommitHash    = hash?.trim() ?? ''
+    base.lastCommitMessage = (msg?.trim() ?? '').slice(0, 60)
+    base.lastCommitDate    = date?.trim() ?? ''
   }
+  if (remotesRes.status === 'fulfilled') base.hasRemote = remotesRes.value.length > 0
+  if (urlRes.status === 'fulfilled') Object.assign(base, parseGitRemoteUrl(urlRes.value))
+  if (statusRes.status === 'fulfilled') {
+    const lines  = statusRes.value.split('\n')
+    const header = lines[0] ?? ''
+    const ahead  = header.match(/ahead (\d+)/)
+    const behind = header.match(/behind (\d+)/)
+    base.ahead   = ahead  ? parseInt(ahead[1])  : 0
+    base.behind  = behind ? parseInt(behind[1]) : 0
+    base.isDirty = lines.slice(1).some(l => l.trim().length > 0)
+  }
+  if (duRes.status === 'fulfilled') base.diskSizeKb = parseInt(duRes.value.split('\t')[0]) || 0
 
   return base
 }
@@ -86,26 +86,25 @@ async function scanDir(scanPath: string): Promise<RepoInfo[]> {
   let dirs: fs.Dirent[]
   try { dirs = fs.readdirSync(scanPath, { withFileTypes: true }) } catch { return [] }
 
-  const repoDirs = dirs
-    .filter(d => d.isDirectory() && fs.existsSync(path.join(scanPath, d.name, '.git')))
-    .map(d => d.name)
-
-  const results: RepoInfo[] = []
-  const batchSize = 5
-  for (let i = 0; i < repoDirs.length; i += batchSize) {
-    const batch = repoDirs.slice(i, i + batchSize)
-    results.push(...await Promise.all(batch.map(n => getRepoInfo(path.join(scanPath, n), n, scanPath))))
-  }
-  return results
+  const repoDirs = dirs.filter(d => d.isDirectory() && fs.existsSync(path.join(scanPath, d.name, '.git')))
+  return Promise.all(repoDirs.map(d => getRepoInfo(path.join(scanPath, d.name), d.name, scanPath)))
 }
+
+// Cache to avoid re-scanning on every request
+let cache: { repos: RepoInfo[]; scanDirs: string[]; total: number } | null = null
+let cacheTs = 0
+const CACHE_TTL = 60_000 // 60s
 
 export async function reposRoutes(app: FastifyInstance) {
   // GET /api/repos
   app.get('/', async () => {
+    if (cache && Date.now() - cacheTs < CACHE_TTL) return cache
     const config = loadConfig()
     const all = await Promise.all(config.scanDirs.map(d => scanDir(d)))
     const repos = all.flat().sort((a, b) => a.name.localeCompare(b.name))
-    return { repos, total: repos.length, scanDirs: config.scanDirs }
+    cache = { repos, total: repos.length, scanDirs: config.scanDirs }
+    cacheTs = Date.now()
+    return cache
   })
 
   // POST /api/repos/clone
@@ -124,8 +123,7 @@ export async function reposRoutes(app: FastifyInstance) {
     const cloneUrl = url.replace(/^https:\/\/github\.com\//, 'git@github.com:').replace(/(?<!\.git)$/, '.git')
 
     try {
-      execSync(`git clone ${JSON.stringify(cloneUrl)} ${JSON.stringify(destPath)}`, {
-        stdio: 'pipe',
+      await execAsync(`git clone ${JSON.stringify(cloneUrl)} ${JSON.stringify(destPath)}`, {
         timeout: 120000,
         env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${process.env.HOME}/.ssh/id_ed25519 -o StrictHostKeyChecking=no` },
       })
@@ -137,6 +135,7 @@ export async function reposRoutes(app: FastifyInstance) {
     if (!config.clonedRepos) config.clonedRepos = []
     config.clonedRepos.push({ url, name: repoName, path: destPath })
     saveConfig(config)
+    cache = null
     return { ok: true, path: destPath, name: repoName }
   })
 
@@ -147,8 +146,9 @@ export async function reposRoutes(app: FastifyInstance) {
     if (!fs.existsSync(repoPath)) return reply.status(400).send({ error: `Path not found: ${repoPath}` })
 
     try {
-      const output = execSync('git pull --ff-only', { cwd: repoPath, stdio: 'pipe', timeout: 60000 }).toString().trim()
-      return { ok: true, output }
+      const { stdout } = await execAsync('git pull --ff-only', { cwd: repoPath, timeout: 60000 })
+      cache = null
+      return { ok: true, output: stdout.trim() }
     } catch (e: unknown) {
       return reply.status(500).send({ error: `Pull failed: ${e instanceof Error ? e.message : String(e)}` })
     }

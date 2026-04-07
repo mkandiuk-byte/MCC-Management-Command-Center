@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/sidebar"
 import {
   FolderCode, Brain, Home, Settings,
-  Wrench, BookOpen, Layers, Terminal, SquareTerminal, Search, GitFork, Kanban, Map, TrendingUp
+  Wrench, BookOpen, Layers, Terminal, SquareTerminal, Search, GitFork, Kanban, Map, TrendingUp,
+  Activity, Network, BarChart2
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -38,6 +39,14 @@ const navItems: {
     items: [
       { titleKey: "nav.jira_boards", href: "/jira", icon: Kanban },
       { titleKey: "nav.keitaro", href: "/keitaro", icon: TrendingUp },
+      { titleKey: "nav.traffic_analytics", href: "/keitaro/analytics", icon: BarChart2 },
+    ],
+  },
+  {
+    groupKey: "nav.analytics",
+    items: [
+      { titleKey: "nav.ad_performance", href: "/ad-performance", icon: Activity },
+      { titleKey: "nav.graph", href: "/graph", icon: Network },
     ],
   },
   {

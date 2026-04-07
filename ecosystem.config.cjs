@@ -117,5 +117,35 @@ module.exports = {
       restart_delay: 3000,
       max_restarts: 5,
     },
+
+    // ── Graph service — campaign chain visualization (port 3805) ────────
+    {
+      name: 'aap-graph',
+      cwd: `${ROOT}/services/graph`,
+      script: 'src/index.ts',
+      interpreter: `${ROOT}/services/graph/node_modules/.bin/tsx`,
+
+      env: { ...SHARED_ENV, PORT: '3805' },
+      error_file: `${process.env.HOME}/Library/Logs/aap-graph-error.log`,
+      out_file: `${process.env.HOME}/Library/Logs/aap-graph.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      restart_delay: 3000,
+      max_restarts: 5,
+    },
+
+    // ── Analytics service — PostgreSQL-based (port 3806) ─────────────
+    {
+      name: 'aap-analytics',
+      cwd: `${ROOT}/services/analytics`,
+      script: 'src/index.ts',
+      interpreter: `${ROOT}/services/analytics/node_modules/.bin/tsx`,
+
+      env: { ...SHARED_ENV, PORT: '3806' },
+      error_file: `${process.env.HOME}/Library/Logs/aap-analytics-error.log`,
+      out_file: `${process.env.HOME}/Library/Logs/aap-analytics.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      restart_delay: 3000,
+      max_restarts: 5,
+    },
   ],
 }
