@@ -14,6 +14,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table"
+import { Users } from "lucide-react"
 import { useI18n } from "@/lib/mcc-i18n"
 
 /* -- Types --------------------------------------------------------- */
@@ -452,6 +453,119 @@ function InfrastructureSection({ data }: { data: InfraData | null }) {
   )
 }
 
+/* -- People Data Types ---------------------------------------------- */
+
+interface PersonRecord {
+  name: string
+  department: string
+  team: string
+  position: string
+  email: string
+}
+
+interface PeopleApiData {
+  people: PersonRecord[]
+  summary: {
+    total: number
+    byDepartment: Record<string, number>
+    byTeam: Record<string, number>
+  }
+  teams: { name: string; memberCount: number }[]
+}
+
+/* -- People & Organization Section --------------------------------- */
+
+function PeopleSection({ data }: { data: PeopleApiData | null }) {
+  if (!data) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-[15px] font-semibold text-[var(--foreground)]">People & Organization</h3>
+          <Skeleton className="h-24 w-full mt-4" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const { summary, teams } = data
+  const departments = Object.entries(summary.byDepartment).sort((a, b) => b[1] - a[1])
+  const maxDeptCount = departments.length > 0 ? departments[0][1] : 1
+
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-[var(--muted-foreground)]" />
+          <h3 className="text-[15px] font-semibold text-[var(--foreground)]">People & Organization</h3>
+        </div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <ScoreBox label="Total People" value={summary.total} status="neutral" />
+          <ScoreBox label="Departments" value={departments.length} status="neutral" />
+          <ScoreBox label="Teams" value={teams.length} status="neutral" />
+          <ScoreBox
+            label="Avg Team Size"
+            value={teams.length > 0 ? (summary.total / teams.length).toFixed(1) : "0"}
+            status="neutral"
+          />
+        </div>
+
+        {/* Department Breakdown */}
+        <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
+          <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">
+            Department Breakdown
+          </p>
+          <div className="space-y-2">
+            {departments.map(([dept, count]) => (
+              <div key={dept} className="flex items-center gap-3">
+                <span className="text-[13px] text-[var(--foreground)] font-medium w-[160px] shrink-0 truncate">
+                  {dept}
+                </span>
+                <div className="flex-1 h-[22px] bg-[rgba(255,255,255,0.04)] rounded-md overflow-hidden">
+                  <div
+                    className="h-full rounded-md bg-[#4C8BF5] transition-all duration-500"
+                    style={{
+                      width: `${Math.max((count / maxDeptCount) * 100, 4)}%`,
+                      opacity: 0.7 + (count / maxDeptCount) * 0.3,
+                    }}
+                  />
+                </div>
+                <span className="text-[13px] font-semibold text-[var(--foreground)] w-[36px] text-right shrink-0">
+                  {count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Teams */}
+        {teams.length > 0 && (
+          <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
+            <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">
+              Teams
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {teams
+                .filter((t) => t.name)
+                .sort((a, b) => b.memberCount - a.memberCount)
+                .map((team) => (
+                  <span
+                    key={team.name}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--foreground)]"
+                  >
+                    {team.name}
+                    <span className="text-[var(--muted-foreground)]">({team.memberCount})</span>
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 /* -- Main Export ---------------------------------------------------- */
 
 export function ProcessesPage() {
@@ -459,6 +573,7 @@ export function ProcessesPage() {
   const [infraData, setInfraData] = useState<InfraData | null>(null)
   const [engData, setEngData] = useState<EngineeringApiData | null>(null)
   const [engLoading, setEngLoading] = useState(true)
+  const [peopleData, setPeopleData] = useState<PeopleApiData | null>(null)
 
   useEffect(() => {
     fetch("/api/mcc/airtable/infra")
@@ -475,6 +590,11 @@ export function ProcessesPage() {
       .catch(() => {
         setEngLoading(false)
       })
+
+    fetch("/api/mcc/airtable/people")
+      .then((r) => r.json())
+      .then(setPeopleData)
+      .catch(() => {})
   }, [])
 
   const sections = buildSections(engData)
@@ -494,6 +614,7 @@ export function ProcessesPage() {
           <SectionCard key={s.department} section={s} />
         ))}
         <InfrastructureSection data={infraData} />
+        <PeopleSection data={peopleData} />
       </div>
     </>
   )

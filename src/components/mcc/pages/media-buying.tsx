@@ -23,7 +23,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-import { ArrowUpDown, Rocket, AlertOctagon, ArrowRight, Skull } from "lucide-react"
+import { ArrowUpDown, Rocket, AlertOctagon, AlertTriangle, ArrowRight, Skull } from "lucide-react"
 import { useI18n } from "@/lib/mcc-i18n"
 
 /* ------------------------------------------------------------------ */
@@ -70,6 +70,19 @@ interface RoiResponse {
   byGeo: RoiRow[]
   byOffer: RoiRow[]
   daily: RoiRow[]
+}
+
+interface AirtableOffersData {
+  offers: {
+    total: number
+    byStatus: Record<string, number>
+    byQuality: Record<string, number>
+    byWorkModel: Record<string, number>
+    active: number
+    withProblems: number
+  }
+  brands: { total: number; list: { name: string; id: number }[] }
+  geos: { total: number; list: string[] }
 }
 
 interface KilledCampaign {
@@ -512,7 +525,40 @@ function GeoTab({ roi }: { roi: RoiResponse | null }) {
 /*  Tab: Offers                                                        */
 /* ------------------------------------------------------------------ */
 
-function OffersTab({ roi }: { roi: RoiResponse | null }) {
+function OfferPipelineStage({
+  label,
+  count,
+  color,
+}: {
+  label: string
+  count: number
+  color: string
+}) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center rounded-xl px-6 py-4 min-w-[120px] border"
+      style={{
+        backgroundColor: `${color}10`,
+        borderColor: `${color}30`,
+      }}
+    >
+      <span className="text-[11px] font-medium text-[var(--muted-foreground)] uppercase tracking-wider whitespace-nowrap">
+        {label}
+      </span>
+      <span className="text-[28px] font-bold mt-1" style={{ color }}>
+        {count}
+      </span>
+    </div>
+  )
+}
+
+function OffersTab({
+  roi,
+  airtableOffers,
+}: {
+  roi: RoiResponse | null
+  airtableOffers: AirtableOffersData | null
+}) {
   const { t } = useI18n()
   const [sortKey, setSortKey] = useState("revenue")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
@@ -542,53 +588,148 @@ function OffersTab({ roi }: { roi: RoiResponse | null }) {
       .slice(0, 15)
   }, [roi?.byOffer, sortKey, sortDir])
 
+  // Pipeline stages from Airtable statuses
+  const pipelineStatuses = ["Arhive", "Видати в роботу", "Очікування Капи", "Заливається"]
+  const pipelineColors: Record<string, string> = {
+    "Arhive": "#6B7A94",
+    "Видати в роботу": "#F5A623",
+    "Очікування Капи": "#4C8BF5",
+    "Заливається": "#52C67E",
+  }
+  const statusCounts = airtableOffers?.offers?.byStatus ?? {}
+
   return (
-    <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
-              <SortableHead label={t("buying.offer")} sortKey="grouping" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
-              <SortableHead label={t("summary.revenue")} sortKey="revenue" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-              <SortableHead label={t("buying.cost")} sortKey="cost" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-              <SortableHead label={t("summary.profit")} sortKey="profit" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-              <SortableHead label={t("common.roi")} sortKey="roi" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-              <SortableHead label={t("buying.conversions")} sortKey="conversions" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {offers.map((o) => (
-              <TableRow
-                key={o.grouping}
-                className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
-              >
-                <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
-                  {o.grouping}
-                </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.revenue)}</TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.cost)}</TableCell>
-                <TableCell className={`text-[13px] font-medium ${profitColor(o.profit)}`}>
-                  {fmt(o.profit)}
-                </TableCell>
-                <TableCell className={`text-[13px] font-medium ${profitColor(o.roi)}`}>
-                  {fmtPct(o.roi)}
-                </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">
-                  {o.conversions.toLocaleString()}
-                </TableCell>
+    <div className="space-y-6">
+      {/* Airtable Offer Pipeline */}
+      {airtableOffers && (
+        <>
+          {/* Score Boxes */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-5">
+                <ScoreBox
+                  label={t("buying.offers") + " Total"}
+                  value={airtableOffers.offers.total}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <ScoreBox
+                  label="Active"
+                  value={airtableOffers.offers.active}
+                  status={airtableOffers.offers.active > 0 ? "ok" : "neutral"}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <ScoreBox
+                  label="Brands"
+                  value={airtableOffers.brands.total}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <ScoreBox
+                  label="Geos"
+                  value={airtableOffers.geos.total}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Status Pipeline Visualization */}
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="text-[13px] font-semibold text-[var(--foreground)] mb-5">
+                Offer Status Pipeline
+              </h3>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {pipelineStatuses.map((status, i) => (
+                  <div key={status} className="flex items-center gap-2">
+                    <OfferPipelineStage
+                      label={status}
+                      count={statusCounts[status] ?? 0}
+                      color={pipelineColors[status] ?? "#6B7A94"}
+                    />
+                    {i < pipelineStatuses.length - 1 && (
+                      <ArrowRight className="h-5 w-5 text-[var(--muted-foreground)] shrink-0" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quality Problems Alert */}
+          {airtableOffers.offers.withProblems > 0 && (
+            <Card className="border-l-[3px] border-l-[#F5A623]">
+              <CardContent className="p-5 flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-[#F5A623] shrink-0" />
+                <div>
+                  <p className="text-[14px] font-semibold text-[var(--foreground)]">
+                    {airtableOffers.offers.withProblems} offers with quality issues
+                  </p>
+                  <p className="text-[12px] text-[var(--muted-foreground)] mt-0.5">
+                    Offers flagged with quality concerns that need attention
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* Existing Keitaro Offers Table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+                <SortableHead label={t("buying.offer")} sortKey="grouping" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
+                <SortableHead label={t("summary.revenue")} sortKey="revenue" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                <SortableHead label={t("buying.cost")} sortKey="cost" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                <SortableHead label={t("summary.profit")} sortKey="profit" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                <SortableHead label={t("common.roi")} sortKey="roi" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                <SortableHead label={t("buying.conversions")} sortKey="conversions" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
               </TableRow>
-            ))}
-            {offers.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-[#6B7A94] py-12">
-                  Loading offer data...
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {offers.map((o) => (
+                <TableRow
+                  key={o.grouping}
+                  className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+                >
+                  <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
+                    {o.grouping}
+                  </TableCell>
+                  <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.revenue)}</TableCell>
+                  <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.cost)}</TableCell>
+                  <TableCell className={`text-[13px] font-medium ${profitColor(o.profit)}`}>
+                    {fmt(o.profit)}
+                  </TableCell>
+                  <TableCell className={`text-[13px] font-medium ${profitColor(o.roi)}`}>
+                    {fmtPct(o.roi)}
+                  </TableCell>
+                  <TableCell className="text-[13px] text-[#C1CCDE]">
+                    {o.conversions.toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {offers.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-[#6B7A94] py-12">
+                    Loading offer data...
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -748,6 +889,7 @@ export function MediaBuyingPage() {
   const [period, setPeriod] = useState(30)
   const [buyerData, setBuyerData] = useState<BuyerResponse | null>(null)
   const [roiData, setRoiData] = useState<RoiResponse | null>(null)
+  const [airtableOffers, setAirtableOffers] = useState<AirtableOffersData | null>(null)
 
   const reload = () => {
     const to = new Date().toISOString().split("T")[0]
@@ -759,6 +901,10 @@ export function MediaBuyingPage() {
     fetch(`/api/mcc/keitaro/roi?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then(setRoiData)
+      .catch(() => {})
+    fetch("/api/mcc/airtable/offers")
+      .then((r) => r.json())
+      .then(setAirtableOffers)
       .catch(() => {})
   }
 
@@ -808,7 +954,7 @@ export function MediaBuyingPage() {
           <GeoTab roi={roiData} />
         </TabsContent>
         <TabsContent value={3}>
-          <OffersTab roi={roiData} />
+          <OffersTab roi={roiData} airtableOffers={airtableOffers} />
         </TabsContent>
         <TabsContent value={4}>
           <OperationsTab data={buyerData} />
