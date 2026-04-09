@@ -83,10 +83,10 @@ export function PageHeader({
         {(subtitle || lastUpdated) && (
           <div className="flex items-center gap-2 mt-1.5">
             {subtitle && (
-              <p className="text-[13px] text-[#6B7A94]">{subtitle}</p>
+              <p className="text-[13px] text-[var(--muted-foreground)]">{subtitle}</p>
             )}
             {lastUpdated && (
-              <span className="text-[12px] text-[#6B7A94] opacity-70">
+              <span className="text-[12px] text-[var(--muted-foreground)] opacity-70">
                 {subtitle ? " · " : ""}Updated {timeAgo(lastUpdated)}
               </span>
             )}
@@ -96,7 +96,7 @@ export function PageHeader({
 
       <div className="flex items-center gap-3 shrink-0">
         {onPeriodChange && (
-          <div className="flex items-center bg-[#12151C] border border-[rgba(255,255,255,0.06)] rounded-lg p-0.5">
+          <div className="flex items-center bg-[var(--muted)] border border-[var(--border)] rounded-lg p-0.5">
             {periods.map((p) => (
               <button
                 key={p.days}
@@ -104,8 +104,8 @@ export function PageHeader({
                 className={cn(
                   "px-3 py-1.5 text-[12px] font-medium rounded-md transition-default",
                   activePeriod === p.days
-                    ? "bg-[#4C8BF5] text-white"
-                    : "text-[#6B7A94] hover:text-[#C1CCDE]"
+                    ? "bg-[var(--accent)] text-white"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 )}
               >
                 {p.label}
@@ -119,13 +119,13 @@ export function PageHeader({
             variant="outline"
             size="sm"
             onClick={handleRefresh}
-            className="border-[rgba(255,255,255,0.06)] bg-transparent text-[#6B7A94] hover:text-[#C1CCDE] hover:bg-[rgba(255,255,255,0.04)]"
+            className="border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]"
           >
             <RefreshCw
               className={cn(
                 "h-3.5 w-3.5",
                 refreshing && "animate-spin",
-                autoRefreshing && "animate-pulse text-[#4C8BF5]"
+                autoRefreshing && "animate-pulse text-[var(--accent)]"
               )}
             />
           </Button>

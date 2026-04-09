@@ -86,24 +86,24 @@ interface EngineeringApiData {
 /* -- Helpers ------------------------------------------------------- */
 
 function stageColor(count: number | undefined): string {
-  if (count === undefined) return "#6B7A94"
-  if (count <= 5) return "#52C67E"
-  if (count <= 10) return "#F5A623"
-  return "#F55D4C"
+  if (count === undefined) return "var(--muted-foreground)"
+  if (count <= 5) return "var(--success)"
+  if (count <= 10) return "var(--warning)"
+  return "var(--error)"
 }
 
 function stageBgColor(count: number | undefined): string {
-  if (count === undefined) return "rgba(107,122,148,0.08)"
-  if (count <= 5) return "rgba(82,198,126,0.08)"
-  if (count <= 10) return "rgba(245,166,35,0.08)"
-  return "rgba(245,93,76,0.08)"
+  if (count === undefined) return "var(--muted)"
+  if (count <= 5) return "var(--success-muted)"
+  if (count <= 10) return "var(--warning-muted)"
+  return "var(--error-muted)"
 }
 
 function stageBorderColor(count: number | undefined): string {
-  if (count === undefined) return "rgba(107,122,148,0.2)"
-  if (count <= 5) return "rgba(82,198,126,0.2)"
-  if (count <= 10) return "rgba(245,166,35,0.2)"
-  return "rgba(245,93,76,0.2)"
+  if (count === undefined) return "var(--border)"
+  if (count <= 5) return "var(--border)"
+  if (count <= 10) return "var(--border)"
+  return "var(--border)"
 }
 
 /* -- Build sections with live data --------------------------------- */
@@ -139,8 +139,8 @@ function buildSections(engData: EngineeringApiData | null): ProcessSection[] {
   // Engineering KPIs from live data
   const asdVel = engData?.teams?.ASD?.sprint?.velocity
   const fsVel = engData?.teams?.FS?.sprint?.velocity
-  const asdBugPct = engData ? Math.round(engData.teams.ASD.bugDensity.ratio * 100) : null
-  const fsBugPct = engData ? Math.round(engData.teams.FS.bugDensity.ratio * 100) : null
+  const asdBugPct = engData ? Math.round(engData.teams.ASD.bugDensity.ratio) : null
+  const fsBugPct = engData ? Math.round(engData.teams.FS.bugDensity.ratio) : null
   const blockedCount = engData?.summary?.totalBlocked
 
   const engKpis: KPI[] = [
@@ -228,7 +228,7 @@ function buildInsights(engData: EngineeringApiData | null): Insight[] {
 
   if (engData) {
     const asdVel = engData.teams.ASD.sprint.velocity
-    const fsBugPct = Math.round(engData.teams.FS.bugDensity.ratio * 100)
+    const fsBugPct = Math.round(engData.teams.FS.bugDensity.ratio)
     const fsVel = engData.teams.FS.sprint.velocity
     const zombies = engData.summary.zombieEpicCount
 
@@ -274,7 +274,7 @@ function buildInsights(engData: EngineeringApiData | null): Insight[] {
 function Pipeline({ stages, label }: { stages: PipelineStage[]; label?: string }) {
   return (
     <div className="space-y-2">
-      {label && <p className="text-[12px] font-medium text-[#6B7A94]">{label}</p>}
+      {label && <p className="text-[12px] font-medium text-[var(--muted-foreground)]">{label}</p>}
       <div className="flex items-center gap-1 overflow-x-auto pb-1">
         {stages.map((stage, i) => (
           <div key={stage.name} className="flex items-center shrink-0">
@@ -285,7 +285,7 @@ function Pipeline({ stages, label }: { stages: PipelineStage[]; label?: string }
                 borderColor: stageBorderColor(stage.count),
               }}
             >
-              <span className="text-[11px] font-medium text-[#C1CCDE] text-center leading-tight whitespace-nowrap">
+              <span className="text-[11px] font-medium text-[var(--secondary-foreground)] text-center leading-tight whitespace-nowrap">
                 {stage.name}
               </span>
               {stage.count !== undefined && (
@@ -298,7 +298,7 @@ function Pipeline({ stages, label }: { stages: PipelineStage[]; label?: string }
               )}
             </div>
             {i < stages.length - 1 && (
-              <span className="text-[#3A4255] text-[16px] mx-0.5 shrink-0">&rarr;</span>
+              <span className="text-[var(--muted-foreground)] text-[16px] mx-0.5 shrink-0">&rarr;</span>
             )}
           </div>
         ))}
@@ -313,7 +313,7 @@ function SectionCard({ section }: { section: ProcessSection }) {
   return (
     <Card>
       <CardContent className="p-6 space-y-5">
-        <h3 className="text-[15px] font-semibold text-[#E8EFFF]">{section.department}</h3>
+        <h3 className="text-[15px] font-semibold text-[var(--foreground)]">{section.department}</h3>
 
         {/* Pipelines */}
         <div className="space-y-4">
@@ -323,8 +323,8 @@ function SectionCard({ section }: { section: ProcessSection }) {
         </div>
 
         {/* KPI Scorecard */}
-        <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
-          <p className="text-[11px] uppercase tracking-wider text-[#6B7A94] mb-3">KPIs</p>
+        <div className="border-t border-[var(--border)] pt-4">
+          <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">KPIs</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {section.kpis.map((kpi) => (
               <ScoreBox
@@ -385,7 +385,7 @@ function InfrastructureSection({ data }: { data: InfraData | null }) {
         <Pipeline stages={pipelineStages} />
 
         {/* KPIs */}
-        <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
+        <div className="border-t border-[var(--border)] pt-4">
           <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">KPIs</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <ScoreBox label="Total Tasks" value={totalTasks} status="neutral" />
@@ -405,11 +405,11 @@ function InfrastructureSection({ data }: { data: InfraData | null }) {
 
         {/* Service Cost Table */}
         {services.length > 0 && (
-          <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
+          <div className="border-t border-[var(--border)] pt-4">
             <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">Service Costs</p>
             <Table>
               <TableHeader>
-                <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+                <TableRow className="border-b-[var(--border)] hover:bg-transparent">
                   <TableHead className="text-[var(--muted-foreground)] text-[12px] font-semibold pl-4">Name</TableHead>
                   <TableHead className="text-[var(--muted-foreground)] text-[12px] font-semibold">Cost</TableHead>
                   <TableHead className="text-[var(--muted-foreground)] text-[12px] font-semibold">Billing Cycle</TableHead>
@@ -420,7 +420,7 @@ function InfrastructureSection({ data }: { data: InfraData | null }) {
                 {services.map((svc) => (
                   <TableRow
                     key={svc.name}
-                    className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+                    className="border-b-[var(--border)] hover:bg-[var(--muted)]"
                   >
                     <TableCell className="pl-4 text-[13px] font-medium text-[var(--foreground)]">
                       {svc.name}
@@ -512,7 +512,7 @@ function PeopleSection({ data }: { data: PeopleApiData | null }) {
         </div>
 
         {/* Department Breakdown */}
-        <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
+        <div className="border-t border-[var(--border)] pt-4">
           <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">
             Department Breakdown
           </p>
@@ -522,9 +522,9 @@ function PeopleSection({ data }: { data: PeopleApiData | null }) {
                 <span className="text-[13px] text-[var(--foreground)] font-medium w-[160px] shrink-0 truncate">
                   {dept}
                 </span>
-                <div className="flex-1 h-[22px] bg-[rgba(255,255,255,0.04)] rounded-md overflow-hidden">
+                <div className="flex-1 h-[22px] bg-[var(--muted)] rounded-md overflow-hidden">
                   <div
-                    className="h-full rounded-md bg-[#4C8BF5] transition-all duration-500"
+                    className="h-full rounded-md bg-[var(--accent)] transition-all duration-500"
                     style={{
                       width: `${Math.max((count / maxDeptCount) * 100, 4)}%`,
                       opacity: 0.7 + (count / maxDeptCount) * 0.3,
@@ -541,7 +541,7 @@ function PeopleSection({ data }: { data: PeopleApiData | null }) {
 
         {/* Teams */}
         {teams.length > 0 && (
-          <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
+          <div className="border-t border-[var(--border)] pt-4">
             <p className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">
               Teams
             </p>
@@ -552,7 +552,7 @@ function PeopleSection({ data }: { data: PeopleApiData | null }) {
                 .map((team) => (
                   <span
                     key={team.name}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--foreground)]"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border border-[var(--input)] bg-[var(--muted)] text-[var(--foreground)]"
                   >
                     {team.name}
                     <span className="text-[var(--muted-foreground)]">({team.memberCount})</span>
@@ -584,21 +584,21 @@ function slaStatusFromCount(count: number): "ok" | "watch" | "stop" {
 }
 
 function slaStatusColor(status: "ok" | "watch" | "stop"): string {
-  if (status === "ok") return "#52C67E"
-  if (status === "watch") return "#F5A623"
-  return "#F55D4C"
+  if (status === "ok") return "var(--success)"
+  if (status === "watch") return "var(--warning)"
+  return "var(--error)"
 }
 
 function slaBgColor(status: "ok" | "watch" | "stop"): string {
-  if (status === "ok") return "rgba(82,198,126,0.08)"
-  if (status === "watch") return "rgba(245,166,35,0.08)"
-  return "rgba(245,93,76,0.08)"
+  if (status === "ok") return "var(--success-muted)"
+  if (status === "watch") return "var(--warning-muted)"
+  return "var(--error-muted)"
 }
 
 function slaBorderColor(status: "ok" | "watch" | "stop"): string {
-  if (status === "ok") return "rgba(82,198,126,0.2)"
-  if (status === "watch") return "rgba(245,166,35,0.2)"
-  return "rgba(245,93,76,0.2)"
+  if (status === "ok") return "var(--border)"
+  if (status === "watch") return "var(--border)"
+  return "var(--border)"
 }
 
 function formatSlaHours(hours: number): string {
@@ -673,7 +673,7 @@ function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null 
                 borderColor: slaBorderColor(entry.status),
               }}
             >
-              <span className="text-[11px] font-medium text-[#C1CCDE] text-center leading-tight whitespace-nowrap">
+              <span className="text-[11px] font-medium text-[var(--secondary-foreground)] text-center leading-tight whitespace-nowrap">
                 {entry.stage}
               </span>
               <span
@@ -692,15 +692,15 @@ function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null 
         {/* Legend */}
         <div className="flex items-center gap-4 pt-2">
           <div className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full bg-[#52C67E]" />
+            <span className="inline-block h-2 w-2 rounded-full bg-[var(--success)]" />
             <span className="text-[11px] text-[var(--muted-foreground)]">0-5 items</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full bg-[#F5A623]" />
+            <span className="inline-block h-2 w-2 rounded-full bg-[var(--warning)]" />
             <span className="text-[11px] text-[var(--muted-foreground)]">6-10 items</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full bg-[#F55D4C]" />
+            <span className="inline-block h-2 w-2 rounded-full bg-[var(--error)]" />
             <span className="text-[11px] text-[var(--muted-foreground)]">&gt;10 items</span>
           </div>
         </div>

@@ -10,6 +10,7 @@ const translations = {
   "nav.engineering": { uk: "Продукт і Розробка", en: "Product & Eng" },
   "nav.processes": { uk: "Процеси", en: "Processes" },
   "nav.analytics": { uk: "Аналітика", en: "Analytics" },
+  "nav.infrastructure": { uk: "Інфраструктура", en: "Infrastructure" },
   "nav.problems": { uk: "Проблеми", en: "Problems" },
   "nav.settings": { uk: "Налаштування", en: "Settings" },
   "nav.darkMode": { uk: "Темна тема", en: "Dark Mode" },

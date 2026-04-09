@@ -102,9 +102,9 @@ function workloadColor(total: number): "green" | "yellow" | "red" {
 }
 
 function progressColor(pct: number): string {
-  if (pct >= 75) return "#52C67E"
-  if (pct >= 25) return "#F5A623"
-  return "#F55D4C"
+  if (pct >= 75) return "var(--success)"
+  if (pct >= 25) return "var(--warning)"
+  return "var(--error)"
 }
 
 /* -- Custom Tooltip ------------------------------------------------ */
@@ -112,8 +112,8 @@ function progressColor(pct: number): string {
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#12151C] px-3 py-2 shadow-lg">
-      <p className="text-[11px] text-[#6B7A94] mb-1">{label}</p>
+    <div className="rounded-lg border border-[var(--input)] bg-[var(--card)] px-3 py-2 shadow-lg">
+      <p className="text-[11px] text-[var(--muted-foreground)] mb-1">{label}</p>
       {payload.map((entry) => (
         <p key={entry.name} className="text-[12px] font-medium" style={{ color: entry.color }}>
           {entry.name}: {entry.value}%
@@ -126,8 +126,8 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 function BugChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#12151C] px-3 py-2 shadow-lg">
-      <p className="text-[11px] text-[#6B7A94] mb-1">{label}</p>
+    <div className="rounded-lg border border-[var(--input)] bg-[var(--card)] px-3 py-2 shadow-lg">
+      <p className="text-[11px] text-[var(--muted-foreground)] mb-1">{label}</p>
       {payload.map((entry) => (
         <p key={entry.name} className="text-[12px] font-medium" style={{ color: entry.color }}>
           {entry.name}: {entry.value}
@@ -220,14 +220,14 @@ function SprintTab({ data }: { data: EngineeringApiResponse }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {sprintCards.map((s) => {
           const vel = s.sprint.velocity
-          const bugPct = Math.round(s.bugDensity.ratio * 100)
+          const bugPct = Math.round(s.bugDensity.ratio)
           return (
             <Card key={s.project}>
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] text-[#6B7A94] uppercase tracking-wider">{s.project}</p>
-                    <p className="text-[15px] font-semibold text-[#E8EFFF] mt-0.5">{s.sprint.name}</p>
+                    <p className="text-[11px] text-[var(--muted-foreground)] uppercase tracking-wider">{s.project}</p>
+                    <p className="text-[15px] font-semibold text-[var(--foreground)] mt-0.5">{s.sprint.name}</p>
                   </div>
                   <ScoreBox
                     label={t("eng.velocity")}
@@ -242,21 +242,21 @@ function SprintTab({ data }: { data: EngineeringApiResponse }) {
                 {/* Progress bar */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[12px] text-[#6B7A94]">{t("eng.sprintProgress")}</span>
-                    <span className="text-[12px] font-medium text-[#E8EFFF]">{vel}%</span>
+                    <span className="text-[12px] text-[var(--muted-foreground)]">{t("eng.sprintProgress")}</span>
+                    <span className="text-[12px] font-medium text-[var(--foreground)]">{vel}%</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                  <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{
                         width: `${vel}%`,
-                        backgroundColor: vel >= 80 ? "#52C67E" : vel >= 65 ? "#F5A623" : "#F55D4C",
+                        backgroundColor: vel >= 80 ? "var(--success)" : vel >= 65 ? "var(--warning)" : "var(--error)",
                       }}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 pt-2 border-t border-[rgba(255,255,255,0.06)]">
+                <div className="grid grid-cols-3 gap-4 pt-2 border-t border-[var(--border)]">
                   <ScoreBox label={t("eng.activeItems")} value={s.sprint.activeItems} />
                   <ScoreBox
                     label={t("eng.bugDensity")}
@@ -278,11 +278,11 @@ function SprintTab({ data }: { data: EngineeringApiResponse }) {
       {/* Velocity Chart */}
       <Card>
         <CardContent className="p-5">
-          <p className="text-[13px] font-semibold text-[#E8EFFF] mb-4">{t("eng.velocityTrend")}</p>
+          <p className="text-[13px] font-semibold text-[var(--foreground)] mb-4">{t("eng.velocityTrend")}</p>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={velocityChartData} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
                 <XAxis dataKey="sprint" tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
@@ -307,13 +307,13 @@ function SprintTab({ data }: { data: EngineeringApiResponse }) {
 function WorkloadBar({ total, max = 10 }: { total: number; max?: number }) {
   const pct = Math.min((total / max) * 100, 100)
   const color = workloadColor(total)
-  const bg = color === "green" ? "#52C67E" : color === "yellow" ? "#F5A623" : "#F55D4C"
+  const bg = color === "green" ? "var(--success)" : color === "yellow" ? "var(--warning)" : "var(--error)"
   return (
     <div className="flex items-center gap-3 flex-1">
-      <div className="flex-1 h-2 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+      <div className="flex-1 h-2 rounded-full bg-[var(--border)] overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: bg }} />
       </div>
-      <span className="text-[12px] font-medium text-[#E8EFFF] w-6 text-right">{total}</span>
+      <span className="text-[12px] font-medium text-[var(--foreground)] w-6 text-right">{total}</span>
     </div>
   )
 }
@@ -322,12 +322,12 @@ function TeamSection({ name, members }: { name: string; members: WorkloadEntry[]
   return (
     <Card>
       <CardContent className="p-5">
-        <p className="text-[13px] font-semibold text-[#E8EFFF] mb-4">{name}</p>
+        <p className="text-[13px] font-semibold text-[var(--foreground)] mb-4">{name}</p>
         <div className="space-y-3">
           {members.map((m) => (
             <div key={m.person} className="flex items-center gap-3">
               <StatusDot status={workloadColor(m.total)} />
-              <span className="text-[13px] text-[#C1CCDE] w-[180px] truncate">{m.person}</span>
+              <span className="text-[13px] text-[var(--secondary-foreground)] w-[180px] truncate">{m.person}</span>
               <WorkloadBar total={m.total} />
             </div>
           ))}
@@ -352,10 +352,10 @@ function TeamsTab({ data }: { data: EngineeringApiResponse }) {
     <div className="space-y-6">
       {/* Bottleneck callout */}
       {allOverloaded.length > 0 && (
-        <Card className="border-l-[3px] border-l-[#F55D4C] bg-[rgba(245,93,76,0.04)]">
+        <Card className="border-l-[3px] border-l-[var(--error)] bg-[var(--error-muted)]">
           <CardContent className="p-5">
-            <p className="text-[13px] font-semibold text-[#F55D4C] mb-1">{t("eng.bottleneckDetected")}</p>
-            <p className="text-[13px] text-[#C1CCDE]">
+            <p className="text-[13px] font-semibold text-[var(--error)] mb-1">{t("eng.bottleneckDetected")}</p>
+            <p className="text-[13px] text-[var(--secondary-foreground)]">
               {allOverloaded.map((w) => `${w.person}: ${w.total} items`).join(". ")}.
             </p>
           </CardContent>
@@ -376,8 +376,8 @@ function BugsTab({ data }: { data: EngineeringApiResponse }) {
   const { t } = useI18n()
   const asdBugs = data.teams.ASD.bugDensity
   const fsBugs = data.teams.FS.bugDensity
-  const asdPct = Math.round(asdBugs.ratio * 100)
-  const fsPct = Math.round(fsBugs.ratio * 100)
+  const asdPct = Math.round(asdBugs.ratio)
+  const fsPct = Math.round(fsBugs.ratio)
 
   const insights: Insight[] = []
   if (fsPct > 50) {
@@ -427,11 +427,11 @@ function BugsTab({ data }: { data: EngineeringApiResponse }) {
 
       <Card>
         <CardContent className="p-5">
-          <p className="text-[13px] font-semibold text-[#E8EFFF] mb-4">{t("eng.bugsVsFeatures")} (90 days)</p>
+          <p className="text-[13px] font-semibold text-[var(--foreground)] mb-4">{t("eng.bugsVsFeatures")} (90 days)</p>
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={bugChartData} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
                 <XAxis dataKey="project" tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<BugChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
@@ -458,10 +458,10 @@ function EpicsTab({ data }: { data: EngineeringApiResponse }) {
     <div className="space-y-6">
       {/* Zombie alert */}
       {zombieCount > 0 && (
-        <Card className="border-l-[3px] border-l-[#F55D4C] bg-[rgba(245,93,76,0.04)]">
+        <Card className="border-l-[3px] border-l-[var(--error)] bg-[var(--error-muted)]">
           <CardContent className="p-5">
-            <p className="text-[13px] font-semibold text-[#F55D4C] mb-1">{t("eng.zombieEpics")}</p>
-            <p className="text-[13px] text-[#C1CCDE]">
+            <p className="text-[13px] font-semibold text-[var(--error)] mb-1">{t("eng.zombieEpics")}</p>
+            <p className="text-[13px] text-[var(--secondary-foreground)]">
               {zombieCount} {t("eng.zombieDesc")}
             </p>
           </CardContent>
@@ -474,16 +474,16 @@ function EpicsTab({ data }: { data: EngineeringApiResponse }) {
           return (
             <Card key={e.key}>
               <CardContent className="p-4 flex items-center gap-4">
-                <span className="text-[11px] font-semibold text-[#6B7A94] uppercase w-8">{e.project}</span>
+                <span className="text-[11px] font-semibold text-[var(--muted-foreground)] uppercase w-8">{e.project}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-[#E8EFFF] truncate">
+                  <p className="text-[13px] font-medium text-[var(--foreground)] truncate">
                     {e.summary}
                     {e.isZombie && (
-                      <span className="ml-2 text-[11px] text-[#F55D4C] font-semibold">ZOMBIE</span>
+                      <span className="ml-2 text-[11px] text-[var(--error)] font-semibold">ZOMBIE</span>
                     )}
                   </p>
                   <div className="flex items-center gap-3 mt-2">
-                    <div className="flex-1 h-2 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                    <div className="flex-1 h-2 rounded-full bg-[var(--border)] overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
                         style={{ width: `${pct}%`, backgroundColor: progressColor(pct) }}
@@ -494,7 +494,7 @@ function EpicsTab({ data }: { data: EngineeringApiResponse }) {
                     </span>
                   </div>
                 </div>
-                <span className="text-[12px] text-[#6B7A94] whitespace-nowrap">
+                <span className="text-[12px] text-[var(--muted-foreground)] whitespace-nowrap">
                   {e.done}/{e.total}
                 </span>
               </CardContent>
@@ -550,7 +550,7 @@ export function EngineeringPage() {
       ) : error || !data ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-[14px] text-[#6B7A94]">Failed to load engineering data. Please try again.</p>
+            <p className="text-[14px] text-[var(--muted-foreground)]">Failed to load engineering data. Please try again.</p>
           </CardContent>
         </Card>
       ) : (

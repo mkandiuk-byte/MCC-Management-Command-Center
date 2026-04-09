@@ -117,13 +117,13 @@ function fmtPct(n: number): string {
 }
 
 function profitColor(n: number): string {
-  return n >= 0 ? "text-[#52C67E]" : "text-[#F55D4C]"
+  return n >= 0 ? "text-[var(--success)]" : "text-[var(--error)]"
 }
 
 function roiBorderColor(roi: number): string {
-  if (roi > 0) return "border-l-[#52C67E]"
-  if (roi >= -20) return "border-l-[#F5A623]"
-  return "border-l-[#F55D4C]"
+  if (roi > 0) return "border-l-[var(--success)]"
+  if (roi >= -20) return "border-l-[var(--warning)]"
+  return "border-l-[var(--error)]"
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,8 +147,8 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#161A24] px-3 py-2 shadow-xl">
-      <p className="text-[11px] text-[#6B7A94] mb-1">{label}</p>
+    <div className="rounded-lg border border-[var(--input)] bg-[var(--popover)] px-3 py-2 shadow-xl">
+      <p className="text-[11px] text-[var(--muted-foreground)] mb-1">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-[12px] font-medium" style={{ color: p.color }}>
           {p.name}: {fmt(p.value)}
@@ -181,13 +181,13 @@ function SortableHead({
 }) {
   return (
     <TableHead
-      className={`cursor-pointer select-none hover:text-[#E8EFFF] text-[#6B7A94] text-[12px] font-semibold ${className ?? ""}`}
+      className={`cursor-pointer select-none hover:text-[var(--foreground)] text-[var(--muted-foreground)] text-[12px] font-semibold ${className ?? ""}`}
       onClick={() => onSort(sortKey)}
     >
       <span className="inline-flex items-center gap-1">
         {label}
         <ArrowUpDown
-          className={`h-3 w-3 ${currentSort === sortKey ? "text-[#4C8BF5]" : "text-[#3A4255]"}`}
+          className={`h-3 w-3 ${currentSort === sortKey ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}
         />
       </span>
     </TableHead>
@@ -339,7 +339,7 @@ function OverviewTab({
       {chartData.length > 0 && (
         <Card>
           <CardContent className="p-5">
-            <h3 className="text-[13px] font-semibold text-[#E8EFFF] mb-4">
+            <h3 className="text-[13px] font-semibold text-[var(--foreground)] mb-4">
               {t("buying.dailyTrend")}
             </h3>
             <div className="h-[280px]">
@@ -355,11 +355,11 @@ function OverviewTab({
                       <stop offset="100%" stopColor="#52C67E" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" />
+                  <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
                     tick={{ fill: "#6B7A94", fontSize: 11 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                    axisLine={{ stroke: "currentColor", strokeOpacity: 0.06 }}
                     tickLine={false}
                   />
                   <YAxis
@@ -395,7 +395,7 @@ function OverviewTab({
       {/* Top 5 Geos */}
       {topGeos.length > 0 && (
         <div>
-          <h3 className="text-[13px] font-semibold text-[#E8EFFF] mb-3">{t("buying.topGeosByProfit")}</h3>
+          <h3 className="text-[13px] font-semibold text-[var(--foreground)] mb-3">{t("buying.topGeosByProfit")}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {topGeos.map((geo) => (
               <Card
@@ -403,13 +403,13 @@ function OverviewTab({
                 className={`border-l-[3px] ${roiBorderColor(geo.roi)}`}
               >
                 <CardContent className="p-4">
-                  <p className="text-[14px] font-semibold text-[#E8EFFF]">
+                  <p className="text-[14px] font-semibold text-[var(--foreground)]">
                     {geo.grouping}
                   </p>
                   <p className={`text-[20px] font-bold mt-1 ${profitColor(geo.roi)}`}>
                     {geo.roi.toFixed(1)}%
                   </p>
-                  <div className="flex items-center gap-3 mt-2 text-[12px] text-[#6B7A94]">
+                  <div className="flex items-center gap-3 mt-2 text-[12px] text-[var(--muted-foreground)]">
                     <span>{t("buying.spend")} {fmt(geo.cost)}</span>
                     <span className={profitColor(geo.profit)}>
                       {t("summary.profit")} {fmt(geo.profit)}
@@ -462,7 +462,7 @@ function BuyersTab({ data }: { data: BuyerResponse | null }) {
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+            <TableRow className="border-b-[var(--border)] hover:bg-transparent">
               <SortableHead label={t("buying.buyer")} sortKey="buyer" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
               <SortableHead label={t("buying.spend")} sortKey="cost" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
               <SortableHead label={t("summary.revenue")} sortKey="revenue" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
@@ -470,28 +470,28 @@ function BuyersTab({ data }: { data: BuyerResponse | null }) {
               <SortableHead label={t("common.roi")} sortKey="roi" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
               <SortableHead label={t("common.cpa")} sortKey="cpa" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
               <SortableHead label={t("buying.campaigns")} sortKey="campaigns" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-              <TableHead className="text-[#6B7A94] text-[12px] font-semibold">{t("buying.signal")}</TableHead>
+              <TableHead className="text-[var(--muted-foreground)] text-[12px] font-semibold">{t("buying.signal")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map((b) => (
               <TableRow
                 key={b.buyer}
-                className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+                className="border-b-[var(--border)] hover:bg-[var(--muted)]"
               >
-                <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
+                <TableCell className="pl-5 text-[13px] font-medium text-[var(--foreground)]">
                   {b.buyer}
                 </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(b.cost)}</TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(b.revenue)}</TableCell>
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(b.cost)}</TableCell>
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(b.revenue)}</TableCell>
                 <TableCell className={`text-[13px] font-medium ${profitColor(b.profit)}`}>
                   {fmt(b.profit)}
                 </TableCell>
                 <TableCell className={`text-[13px] font-medium ${profitColor(b.roi)}`}>
                   {fmtPct(b.roi)}
                 </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">${b.cpa}</TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">{b.campaigns}</TableCell>
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">${b.cpa}</TableCell>
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{b.campaigns}</TableCell>
                 <TableCell>
                   <SignalBadge signal={b.signal as Signal} />
                 </TableCell>
@@ -499,7 +499,7 @@ function BuyersTab({ data }: { data: BuyerResponse | null }) {
             ))}
             {sorted.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-[#6B7A94] py-12">
+                <TableCell colSpan={8} className="text-center text-[var(--muted-foreground)] py-12">
                   Loading buyer data...
                 </TableCell>
               </TableRow>
@@ -532,7 +532,7 @@ function GeoTab({ roi }: { roi: RoiResponse | null }) {
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[15px] font-semibold text-[#E8EFFF]">
+                <p className="text-[15px] font-semibold text-[var(--foreground)]">
                   {geo.grouping}
                 </p>
                 <p className={`text-[26px] font-bold mt-1 ${profitColor(geo.roi)}`}>
@@ -542,24 +542,24 @@ function GeoTab({ roi }: { roi: RoiResponse | null }) {
             </div>
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div>
-                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("buying.spend")}</p>
-                <p className="text-[14px] font-medium text-[#C1CCDE] mt-0.5">{fmt(geo.cost)}</p>
+                <p className="text-[11px] text-[var(--muted-foreground)] uppercase tracking-wide">{t("buying.spend")}</p>
+                <p className="text-[14px] font-medium text-[var(--secondary-foreground)] mt-0.5">{fmt(geo.cost)}</p>
               </div>
               <div>
-                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("summary.profit")}</p>
+                <p className="text-[11px] text-[var(--muted-foreground)] uppercase tracking-wide">{t("summary.profit")}</p>
                 <p className={`text-[14px] font-medium mt-0.5 ${profitColor(geo.profit)}`}>
                   {fmt(geo.profit)}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("buying.clicks")}</p>
-                <p className="text-[14px] font-medium text-[#C1CCDE] mt-0.5">
+                <p className="text-[11px] text-[var(--muted-foreground)] uppercase tracking-wide">{t("buying.clicks")}</p>
+                <p className="text-[14px] font-medium text-[var(--secondary-foreground)] mt-0.5">
                   {geo.clicks.toLocaleString()}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("buying.conversions")}</p>
-                <p className="text-[14px] font-medium text-[#C1CCDE] mt-0.5">
+                <p className="text-[11px] text-[var(--muted-foreground)] uppercase tracking-wide">{t("buying.conversions")}</p>
+                <p className="text-[14px] font-medium text-[var(--secondary-foreground)] mt-0.5">
                   {geo.conversions.toLocaleString()}
                 </p>
               </div>
@@ -569,7 +569,7 @@ function GeoTab({ roi }: { roi: RoiResponse | null }) {
       ))}
       {geos.length === 0 && (
         <Card className="col-span-full">
-          <CardContent className="p-12 text-center text-[#6B7A94]">
+          <CardContent className="p-12 text-center text-[var(--muted-foreground)]">
             Loading geo data...
           </CardContent>
         </Card>
@@ -722,9 +722,9 @@ function OffersTab({
 
           {/* Quality Problems Alert */}
           {airtableOffers.offers.withProblems > 0 && (
-            <Card className="border-l-[3px] border-l-[#F5A623]">
+            <Card className="border-l-[3px] border-l-[var(--warning)]">
               <CardContent className="p-5 flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5 text-[#F5A623] shrink-0" />
+                <AlertTriangle className="h-5 w-5 text-[var(--warning)] shrink-0" />
                 <div>
                   <p className="text-[14px] font-semibold text-[var(--foreground)]">
                     {airtableOffers.offers.withProblems} offers with quality issues
@@ -744,7 +744,7 @@ function OffersTab({
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+              <TableRow className="border-b-[var(--border)] hover:bg-transparent">
                 <SortableHead label={t("buying.offer")} sortKey="grouping" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
                 <SortableHead label={t("summary.revenue")} sortKey="revenue" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                 <SortableHead label={t("buying.cost")} sortKey="cost" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
@@ -757,27 +757,27 @@ function OffersTab({
               {offers.map((o) => (
                 <TableRow
                   key={o.grouping}
-                  className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+                  className="border-b-[var(--border)] hover:bg-[var(--muted)]"
                 >
-                  <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
+                  <TableCell className="pl-5 text-[13px] font-medium text-[var(--foreground)]">
                     {o.grouping}
                   </TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.revenue)}</TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.cost)}</TableCell>
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(o.revenue)}</TableCell>
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(o.cost)}</TableCell>
                   <TableCell className={`text-[13px] font-medium ${profitColor(o.profit)}`}>
                     {fmt(o.profit)}
                   </TableCell>
                   <TableCell className={`text-[13px] font-medium ${profitColor(o.roi)}`}>
                     {fmtPct(o.roi)}
                   </TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">
                     {o.conversions.toLocaleString()}
                   </TableCell>
                 </TableRow>
               ))}
               {offers.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-[#6B7A94] py-12">
+                  <TableCell colSpan={6} className="text-center text-[var(--muted-foreground)] py-12">
                     Loading offer data...
                   </TableCell>
                 </TableRow>
@@ -916,7 +916,7 @@ function OperationsTab({ data }: { data: BuyerResponse | null }) {
               {recentlyKilled.map((c, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-4 rounded-lg border border-[rgba(255,255,255,0.06)] px-4 py-3 bg-[rgba(245,93,76,0.04)]"
+                  className="flex items-center gap-4 rounded-lg border border-[var(--border)] px-4 py-3 bg-[var(--error-muted)]"
                 >
                   <span className="text-[13px] font-medium text-[var(--foreground)] flex-1 truncate max-w-[240px]">
                     {c.name}
@@ -993,7 +993,7 @@ export function MediaBuyingPage() {
       <Tabs defaultValue={0}>
         <TabsList
           variant="line"
-          className="mb-6 border-b border-[rgba(255,255,255,0.06)] pb-0"
+          className="mb-6 border-b border-[var(--border)] pb-0"
         >
           <TabsTrigger value={0} className="text-[13px] px-4 py-2">
             {t("buying.overview")}

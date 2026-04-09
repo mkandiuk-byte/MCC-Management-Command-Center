@@ -328,7 +328,7 @@ export function ExecutiveSummary() {
         />
 
         <DeptCard
-          name="Infrastructure"
+          name={t("nav.infrastructure" as any) || "Infrastructure"}
           href="/processes"
           status={overdueCount > 0 ? "red" : inProgressCount > 0 ? "green" : "yellow"}
           metrics={[

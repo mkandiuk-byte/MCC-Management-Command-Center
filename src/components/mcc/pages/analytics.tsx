@@ -80,7 +80,7 @@ function fmtPct(n: number): string {
 }
 
 function profitColor(n: number): string {
-  return n >= 0 ? "text-[#52C67E]" : "text-[#F55D4C]"
+  return n >= 0 ? "text-[var(--success)]" : "text-[var(--error)]"
 }
 
 /* ------------------------------------------------------------------ */
@@ -106,13 +106,13 @@ function SortableHead({
 }) {
   return (
     <TableHead
-      className={`cursor-pointer select-none hover:text-[#E8EFFF] text-[#6B7A94] text-[12px] font-semibold ${className ?? ""}`}
+      className={`cursor-pointer select-none hover:text-[var(--foreground)] text-[var(--muted-foreground)] text-[12px] font-semibold ${className ?? ""}`}
       onClick={() => onSort(sortKey)}
     >
       <span className="inline-flex items-center gap-1">
         {label}
         <ArrowUpDown
-          className={`h-3 w-3 ${currentSort === sortKey ? "text-[#4C8BF5]" : "text-[#3A4255]"}`}
+          className={`h-3 w-3 ${currentSort === sortKey ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}
         />
       </span>
     </TableHead>
@@ -194,13 +194,13 @@ function AdPerformanceTab({ data }: { data: BuyerResponse | null }) {
 
       {/* Filter */}
       <div className="flex items-center gap-3">
-        <label className="text-[12px] text-[#6B7A94] font-medium">{t("analytics.minSpend")}</label>
+        <label className="text-[12px] text-[var(--muted-foreground)] font-medium">{t("analytics.minSpend")}</label>
         <Input
           type="number"
           placeholder="0"
           value={minSpend}
           onChange={(e) => setMinSpend(e.target.value)}
-          className="w-32 h-8 bg-[#12151C] border-[rgba(255,255,255,0.08)] text-[#E8EFFF] text-[13px] placeholder:text-[#3A4255]"
+          className="w-32 h-8 bg-[var(--card)] border-[var(--input)] text-[var(--foreground)] text-[13px] placeholder:text-[var(--muted-foreground)]"
         />
       </div>
 
@@ -209,7 +209,7 @@ function AdPerformanceTab({ data }: { data: BuyerResponse | null }) {
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+              <TableRow className="border-b-[var(--border)] hover:bg-transparent">
                 <SortableHead label={t("buying.buyer")} sortKey="buyer" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
                 <SortableHead label={t("buying.clicks")} sortKey="clicks" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                 <SortableHead label={t("common.ftds")} sortKey="conversions" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
@@ -218,33 +218,33 @@ function AdPerformanceTab({ data }: { data: BuyerResponse | null }) {
                 <SortableHead label={t("summary.profit")} sortKey="profit" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                 <SortableHead label={t("common.roi")} sortKey="roi" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                 <SortableHead label={t("common.cpa")} sortKey="cpa" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                <TableHead className="text-[#6B7A94] text-[12px] font-semibold">{t("buying.signal")}</TableHead>
+                <TableHead className="text-[var(--muted-foreground)] text-[12px] font-semibold">{t("buying.signal")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((b) => (
                 <TableRow
                   key={b.buyer}
-                  className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+                  className="border-b-[var(--border)] hover:bg-[var(--muted)]"
                 >
-                  <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
+                  <TableCell className="pl-5 text-[13px] font-medium text-[var(--foreground)]">
                     {b.buyer}
                   </TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">
                     {b.clicks.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">
                     {b.conversions.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(b.cost)}</TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(b.revenue)}</TableCell>
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(b.cost)}</TableCell>
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(b.revenue)}</TableCell>
                   <TableCell className={`text-[13px] font-medium ${profitColor(b.profit)}`}>
                     {fmt(b.profit)}
                   </TableCell>
                   <TableCell className={`text-[13px] font-medium ${profitColor(b.roi)}`}>
                     {fmtPct(b.roi)}
                   </TableCell>
-                  <TableCell className="text-[13px] text-[#C1CCDE]">${b.cpa}</TableCell>
+                  <TableCell className="text-[13px] text-[var(--secondary-foreground)]">${b.cpa}</TableCell>
                   <TableCell>
                     <SignalBadge signal={b.signal as Signal} />
                   </TableCell>
@@ -252,7 +252,7 @@ function AdPerformanceTab({ data }: { data: BuyerResponse | null }) {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-[#6B7A94] py-12">
+                  <TableCell colSpan={9} className="text-center text-[var(--muted-foreground)] py-12">
                     {buyers.length === 0 ? "Loading..." : "No buyers match the filter."}
                   </TableCell>
                 </TableRow>
@@ -302,7 +302,7 @@ function GeoBenchmarksTab({ roi }: { roi: RoiResponse | null }) {
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+            <TableRow className="border-b-[var(--border)] hover:bg-transparent">
               <SortableHead label={t("buying.country")} sortKey="grouping" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
               <SortableHead label={t("buying.clicks")} sortKey="clicks" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
               <SortableHead label={t("buying.conversions")} sortKey="conversions" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
@@ -317,33 +317,33 @@ function GeoBenchmarksTab({ roi }: { roi: RoiResponse | null }) {
             {geos.map((g) => (
               <TableRow
                 key={g.grouping}
-                className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+                className="border-b-[var(--border)] hover:bg-[var(--muted)]"
               >
-                <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
+                <TableCell className="pl-5 text-[13px] font-medium text-[var(--foreground)]">
                   {g.grouping}
                 </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">
                   {g.clicks.toLocaleString()}
                 </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">
                   {g.conversions.toLocaleString()}
                 </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(g.revenue)}</TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(g.cost)}</TableCell>
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(g.revenue)}</TableCell>
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">{fmt(g.cost)}</TableCell>
                 <TableCell className={`text-[13px] font-medium ${profitColor(g.profit)}`}>
                   {fmt(g.profit)}
                 </TableCell>
                 <TableCell className={`text-[13px] font-medium ${profitColor(g.roi)}`}>
                   {fmtPct(g.roi)}
                 </TableCell>
-                <TableCell className="text-[13px] text-[#C1CCDE]">
+                <TableCell className="text-[13px] text-[var(--secondary-foreground)]">
                   ${g.cpa.toFixed(0)}
                 </TableCell>
               </TableRow>
             ))}
             {geos.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-[#6B7A94] py-12">
+                <TableCell colSpan={8} className="text-center text-[var(--muted-foreground)] py-12">
                   Loading geo data...
                 </TableCell>
               </TableRow>
@@ -363,15 +363,15 @@ function ConversionQualityTab() {
   const { t } = useI18n()
   return (
     <div className="space-y-4">
-      <Card className="border-[rgba(255,255,255,0.06)]">
+      <Card className="border-[var(--border)]">
         <CardContent className="p-8 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <FlaskConical className="h-5 w-5 text-[#4C8BF5]" />
-            <h3 className="text-[15px] font-semibold text-[#E8EFFF]">
+            <FlaskConical className="h-5 w-5 text-[var(--accent)]" />
+            <h3 className="text-[15px] font-semibold text-[var(--foreground)]">
               {t("analytics.convQualityAnalysis")}
             </h3>
           </div>
-          <p className="text-[13px] text-[#6B7A94] max-w-lg mx-auto leading-relaxed mb-6">
+          <p className="text-[13px] text-[var(--muted-foreground)] max-w-lg mx-auto leading-relaxed mb-6">
             Requires analytics service (port 3806). When connected, this tab
             will show approval rates, rejection rates, and revenue
             reconciliation data.
@@ -382,8 +382,8 @@ function ConversionQualityTab() {
       {/* Preview of data structure */}
       <Card>
         <CardContent className="p-5">
-          <h3 className="text-[13px] font-semibold text-[#E8EFFF] mb-4 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-[#6B7A94]" />
+          <h3 className="text-[13px] font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-[var(--muted-foreground)]" />
             {t("analytics.availableWhenConnected")}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -395,10 +395,10 @@ function ConversionQualityTab() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-4"
+                className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4"
               >
-                <p className="text-[13px] font-medium text-[#C1CCDE]">{item.label}</p>
-                <p className="text-[12px] text-[#6B7A94] mt-1">{item.desc}</p>
+                <p className="text-[13px] font-medium text-[var(--secondary-foreground)]">{item.label}</p>
+                <p className="text-[12px] text-[var(--muted-foreground)] mt-1">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -448,7 +448,7 @@ export function AnalyticsPage() {
       <Tabs defaultValue={0}>
         <TabsList
           variant="line"
-          className="mb-6 border-b border-[rgba(255,255,255,0.06)] pb-0"
+          className="mb-6 border-b border-[var(--border)] pb-0"
         >
           <TabsTrigger value={0} className="text-[13px] px-4 py-2">
             {t("analytics.adPerformance")}

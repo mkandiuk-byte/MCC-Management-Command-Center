@@ -46,8 +46,8 @@ export function DeptCard({ name, href, status, metrics, alert, className }: Dept
           </div>
 
           {alert && (
-            <div className="mt-5 pt-4 border-t border-[rgba(255,255,255,0.06)]">
-              <p className="text-[12px] text-[#F5A623] font-medium leading-snug line-clamp-2">
+            <div className="mt-5 pt-4 border-t border-[var(--border)]">
+              <p className="text-[12px] text-[var(--warning)] font-medium leading-snug line-clamp-2">
                 ⚠ {alert}
               </p>
             </div>

@@ -73,12 +73,12 @@ export function Sidebar() {
                 "group flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium transition-all duration-300 relative overflow-hidden",
                 collapsed && "justify-center px-2",
                 active
-                  ? "bg-white/70 dark:bg-white/10 text-[#5B6BF5] dark:text-[#8B9FF5] shadow-sm shadow-[rgba(91,107,245,0.08)]"
-                  : "text-[#6B6B8D] dark:text-[#7888A5] hover:text-[#3D3D5C] dark:hover:text-[#C1CCDE] hover:bg-white/40 dark:hover:bg-white/5"
+                  ? "bg-[var(--sidebar-accent)] text-[var(--accent)] shadow-sm shadow-[rgba(91,107,245,0.08)]"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]"
               )}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-[#5B6BF5] to-[#A87EF5]" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-[var(--accent)] to-[var(--chart-3)]" />
               )}
               <item.icon className={cn(
                 "shrink-0 transition-transform duration-300 group-hover:scale-110",
@@ -94,7 +94,7 @@ export function Sidebar() {
       <div className="px-3 pb-4 space-y-0.5">
         <Link
           href="/settings"
-          className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium text-[#6B6B8D] dark:text-[#7888A5] hover:text-[#3D3D5C] dark:hover:text-[#C1CCDE] hover:bg-white/40 dark:hover:bg-white/5 transition-all duration-300"
+          className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-all duration-300"
         >
           <Settings className="h-[18px] w-[18px] shrink-0" />
           {!collapsed && <span>{t("nav.settings")}</span>}
@@ -102,7 +102,7 @@ export function Sidebar() {
 
         <button
           onClick={toggleTheme}
-          className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium text-[#6B6B8D] dark:text-[#7888A5] hover:text-[#3D3D5C] dark:hover:text-[#C1CCDE] hover:bg-white/40 dark:hover:bg-white/5 transition-all duration-300 w-full"
+          className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-all duration-300 w-full"
         >
           {dark ? <Sun className="h-[18px] w-[18px] shrink-0" /> : <Moon className="h-[18px] w-[18px] shrink-0" />}
           {!collapsed && <span>{dark ? t("nav.lightMode") : t("nav.darkMode")}</span>}
@@ -116,7 +116,7 @@ export function Sidebar() {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium text-[#9999B3] dark:text-[#5A6A80] hover:text-[#6B6B8D] hover:bg-white/30 dark:hover:bg-white/5 transition-all duration-300 w-full"
+          className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium text-[var(--muted-foreground)] hover:text-[var(--secondary-foreground)] hover:bg-[var(--muted)] transition-all duration-300 w-full"
         >
           {collapsed ? <PanelLeft className="h-[18px] w-[18px] shrink-0" /> : <><PanelLeftClose className="h-[18px] w-[18px] shrink-0" /><span>{t("nav.collapse")}</span></>}
         </button>
