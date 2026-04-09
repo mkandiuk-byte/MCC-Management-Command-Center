@@ -23,6 +23,29 @@ interface InfraData {
   services: { name: string; cost: number; billingCycle: string; nextPayment: string; daysLeft: number }[]
 }
 
+interface EngineeringApiData {
+  teams: {
+    ASD: {
+      sprint: { name: string; velocity: number }
+      bugDensity: { ratio: number }
+      blocked: { count: number }
+    }
+    FS: {
+      sprint: { name: string; velocity: number }
+      bugDensity: { ratio: number }
+      blocked: { count: number }
+    }
+  }
+  summary: {
+    totalVelocity: number
+    avgBugDensity: number
+    totalBlocked: number
+    zombieEpicCount: number
+  }
+  updatedAt: string
+  source: "jira_api" | "fallback"
+}
+
 function fmt(n: number): string {
   const abs = Math.abs(n)
   if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
@@ -34,6 +57,7 @@ export function ExecutiveSummary() {
   const [buyers, setBuyers] = useState<BuyerData | null>(null)
   const [problems, setProblems] = useState<ProblemData | null>(null)
   const [infra, setInfra] = useState<InfraData | null>(null)
+  const [engData, setEngData] = useState<EngineeringApiData | null>(null)
   const [period, setPeriod] = useState(30)
   const { t } = useI18n()
 
@@ -43,6 +67,7 @@ export function ExecutiveSummary() {
     fetch(`/api/mcc/keitaro/buyers?from=${from}&to=${to}`).then(r => r.json()).then(setBuyers).catch(() => {})
     fetch("/api/mcc/problems").then(r => r.json()).then(setProblems).catch(() => {})
     fetch("/api/mcc/airtable/infra").then(r => r.json()).then(setInfra).catch(() => {})
+    fetch("/api/mcc/jira/engineering").then(r => r.json()).then(setEngData).catch(() => {})
   }
 
   useEffect(() => { reload() }, [period])
@@ -59,6 +84,41 @@ export function ExecutiveSummary() {
   const inProgressCount = infraTasks.filter(t => t.status === "in_progress" || t.status === "In Progress").length
   const serviceCount = infraServices.length
   const overdueCount = infraServices.filter(s => s.daysLeft < 0).length
+
+  // Engineering metrics from live data
+  const engSummary = engData?.summary
+  const engVelocity = engSummary?.totalVelocity
+  const engBugDensity = engSummary?.avgBugDensity
+  const engBlocked = engSummary?.totalBlocked
+  const engSprintName = engData?.teams?.ASD?.sprint?.name ?? "—"
+
+  // Engineering status coloring
+  const velocityStatus: "ok" | "watch" | "stop" | "neutral" = engVelocity != null
+    ? (engVelocity >= 80 ? "ok" : engVelocity >= 65 ? "watch" : "stop")
+    : "neutral"
+  const bugDensityStatus: "ok" | "watch" | "stop" | "neutral" = engBugDensity != null
+    ? (engBugDensity <= 30 ? "ok" : engBugDensity <= 45 ? "watch" : "stop")
+    : "neutral"
+  const blockedStatus: "ok" | "watch" | "stop" | "neutral" = engBlocked != null
+    ? (engBlocked === 0 ? "ok" : engBlocked <= 5 ? "watch" : "stop")
+    : "neutral"
+
+  // Engineering alert
+  const engHasAlert = (engVelocity != null && engVelocity < 70) ||
+    (engBugDensity != null && engBugDensity > 40) ||
+    (engBlocked != null && engBlocked > 10)
+
+  const engAlertParts: string[] = []
+  if (engVelocity != null && engVelocity < 70) engAlertParts.push(`Velocity at ${engVelocity}%`)
+  if (engBugDensity != null && engBugDensity > 40) engAlertParts.push(`Bug density ${engBugDensity}%`)
+  if (engBlocked != null && engBlocked > 10) engAlertParts.push(`${engBlocked} blocked items`)
+  const engAlertText = engAlertParts.length > 0 ? engAlertParts.join(". ") + "." : undefined
+
+  // Engineering DeptCard overall status
+  const engCardStatus: "green" | "yellow" | "red" | "gray" = !engData ? "gray"
+    : engHasAlert ? "red"
+    : velocityStatus === "ok" && bugDensityStatus !== "stop" ? "green"
+    : "yellow"
 
   // Compute insights from real data
   const insights: Insight[] = []
@@ -164,14 +224,14 @@ export function ExecutiveSummary() {
         <DeptCard
           name={t("nav.engineering")}
           href="/engineering"
-          status="yellow"
+          status={engCardStatus}
           metrics={[
-            { label: t("eng.sprint"), value: "MB AP 20" },
-            { label: t("eng.velocity"), value: "61%", status: "stop" },
-            { label: t("eng.bugDensity"), value: "44%", status: "stop" },
-            { label: t("eng.blocked"), value: "12", status: "watch" },
+            { label: t("eng.sprint"), value: engData ? engSprintName : "..." },
+            { label: t("eng.velocity"), value: engVelocity != null ? `${engVelocity}%` : "—", status: velocityStatus },
+            { label: t("eng.bugDensity"), value: engBugDensity != null ? `${engBugDensity}%` : "—", status: bugDensityStatus },
+            { label: t("eng.blocked"), value: engBlocked != null ? `${engBlocked}` : "—", status: blockedStatus },
           ]}
-          alert="Sprint velocity dropped from 87% avg to 61%. 53% of FS work is bug-fixing."
+          alert={engAlertText}
         />
 
         <DeptCard

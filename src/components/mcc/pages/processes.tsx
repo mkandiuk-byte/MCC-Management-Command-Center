@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/mcc/page-header"
 import { ScoreBox } from "@/components/mcc/score-box"
 import { InsightsCard, type Insight } from "@/components/mcc/insights-card"
 import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableHeader,
@@ -24,7 +25,7 @@ interface PipelineStage {
 
 interface KPI {
   label: string
-  value: string
+  value: string | number
   status: "ok" | "watch" | "stop" | "neutral"
   sub?: string
 }
@@ -54,6 +55,33 @@ interface InfraData {
   services: InfraService[]
 }
 
+interface EngineeringApiData {
+  teams: {
+    ASD: {
+      sprint: { name: string; velocity: number; doneIssues: number; totalIssues: number }
+      bugDensity: { bugCount90d: number; totalCount90d: number; ratio: number }
+      blocked: { count: number }
+      pipeline: Record<string, number>
+      workload: { person: string; total: number }[]
+    }
+    FS: {
+      sprint: { name: string; velocity: number; doneIssues: number; totalIssues: number }
+      bugDensity: { bugCount90d: number; totalCount90d: number; ratio: number }
+      blocked: { count: number }
+      pipeline: Record<string, number>
+      workload: { person: string; total: number }[]
+    }
+  }
+  summary: {
+    totalVelocity: number
+    avgBugDensity: number
+    totalBlocked: number
+    zombieEpicCount: number
+  }
+  updatedAt: string
+  source: "jira_api" | "fallback"
+}
+
 /* -- Helpers ------------------------------------------------------- */
 
 function stageColor(count: number | undefined): string {
@@ -77,110 +105,168 @@ function stageBorderColor(count: number | undefined): string {
   return "rgba(245,93,76,0.2)"
 }
 
-/* -- Data ---------------------------------------------------------- */
+/* -- Build sections with live data --------------------------------- */
 
-const insights: Insight[] = [
-  {
-    type: "warning",
-    text: "ASD sprint velocity dropped to 61% (avg 87%). 12 items blocked, 7 by a single developer.",
-  },
-  {
-    type: "warning",
-    text: "FS bug density at 53% -- over half of sprint capacity consumed by bug-fixing.",
-  },
-  {
+function buildSections(engData: EngineeringApiData | null): ProcessSection[] {
+  // ASD pipeline from live data or fallback
+  const asdPipeline = engData?.teams?.ASD?.pipeline
+  const asdPipelineStages: PipelineStage[] = asdPipeline
+    ? Object.entries(asdPipeline).map(([name, count]) => ({ name, count }))
+    : [
+        { name: "Open", count: undefined },
+        { name: "In Progress", count: undefined },
+        { name: "Code Review", count: undefined },
+        { name: "QA", count: undefined },
+        { name: "Ready to Stage", count: undefined },
+        { name: "Done" },
+      ]
+
+  // FS pipeline from live data or fallback
+  const fsPipeline = engData?.teams?.FS?.pipeline
+  const fsPipelineStages: PipelineStage[] = fsPipeline
+    ? Object.entries(fsPipeline).map(([name, count]) => ({ name, count }))
+    : [
+        { name: "To Do", count: undefined },
+        { name: "Design", count: undefined },
+        { name: "In Progress", count: undefined },
+        { name: "Code Review", count: undefined },
+        { name: "QA", count: undefined },
+        { name: "Staging", count: undefined },
+        { name: "Closed" },
+      ]
+
+  // Engineering KPIs from live data
+  const asdVel = engData?.teams?.ASD?.sprint?.velocity
+  const fsVel = engData?.teams?.FS?.sprint?.velocity
+  const asdBugPct = engData ? Math.round(engData.teams.ASD.bugDensity.ratio * 100) : null
+  const fsBugPct = engData ? Math.round(engData.teams.FS.bugDensity.ratio * 100) : null
+  const blockedCount = engData?.summary?.totalBlocked
+
+  const engKpis: KPI[] = [
+    {
+      label: "Sprint Velocity ASD",
+      value: asdVel != null ? `${asdVel}%` : "—",
+      status: asdVel != null ? (asdVel >= 80 ? "ok" : asdVel >= 65 ? "watch" : "stop") : "neutral",
+    },
+    {
+      label: "Sprint Velocity FS",
+      value: fsVel != null ? `${fsVel}%` : "—",
+      status: fsVel != null ? (fsVel >= 80 ? "ok" : fsVel >= 65 ? "watch" : "stop") : "neutral",
+    },
+    {
+      label: "Bug Density ASD",
+      value: asdBugPct != null ? `${asdBugPct}%` : "—",
+      status: asdBugPct != null ? (asdBugPct > 50 ? "stop" : asdBugPct > 35 ? "watch" : "ok") : "neutral",
+    },
+    {
+      label: "Bug Density FS",
+      value: fsBugPct != null ? `${fsBugPct}%` : "—",
+      status: fsBugPct != null ? (fsBugPct > 50 ? "stop" : fsBugPct > 35 ? "watch" : "ok") : "neutral",
+    },
+    {
+      label: "Blocked Items",
+      value: blockedCount != null ? `${blockedCount}` : "—",
+      status: blockedCount != null ? (blockedCount > 5 ? "stop" : blockedCount > 0 ? "watch" : "ok") : "neutral",
+    },
+  ]
+
+  return [
+    {
+      department: "Media Buying",
+      pipelines: [
+        {
+          stages: [
+            { name: "Hypothesis" },
+            { name: "Creative" },
+            { name: "Account Setup" },
+            { name: "Launch" },
+            { name: "Monitor" },
+            { name: "Optimize/Kill" },
+          ],
+        },
+      ],
+      kpis: [
+        { label: "Overall ROI", value: "10%", status: "watch" },
+        { label: "Monthly Profit", value: "$309K", status: "ok" },
+        { label: "STOP Campaigns", value: "3", status: "stop" },
+        { label: "Avg CPA", value: "by geo", status: "neutral" },
+      ],
+    },
+    {
+      department: "Product & Engineering",
+      pipelines: [
+        { label: "ASD Pipeline", stages: asdPipelineStages },
+        { label: "FS Pipeline", stages: fsPipelineStages },
+      ],
+      kpis: engKpis,
+    },
+    {
+      department: "Analytics",
+      pipelines: [
+        {
+          stages: [
+            { name: "Request" },
+            { name: "Queue" },
+            { name: "Analysis" },
+            { name: "Review" },
+            { name: "Delivery" },
+          ],
+        },
+      ],
+      kpis: [
+        { label: "Report Turnaround", value: "weeks", status: "stop" },
+        { label: "Data Freshness", value: "15 min", status: "ok" },
+        { label: "Self-Serve Coverage", value: "~60%", status: "watch" },
+      ],
+    },
+  ]
+}
+
+function buildInsights(engData: EngineeringApiData | null): Insight[] {
+  const insights: Insight[] = []
+
+  if (engData) {
+    const asdVel = engData.teams.ASD.sprint.velocity
+    const fsBugPct = Math.round(engData.teams.FS.bugDensity.ratio * 100)
+    const fsVel = engData.teams.FS.sprint.velocity
+    const zombies = engData.summary.zombieEpicCount
+
+    if (asdVel < 70) {
+      insights.push({
+        type: "warning",
+        text: `ASD sprint velocity at ${asdVel}%. ${engData.summary.totalBlocked} items blocked.`,
+      })
+    }
+    if (fsBugPct > 50) {
+      insights.push({
+        type: "warning",
+        text: `FS bug density at ${fsBugPct}% -- over half of sprint capacity consumed by bug-fixing.`,
+      })
+    }
+    if (fsVel >= 80) {
+      insights.push({
+        type: "success",
+        text: `FS sprint velocity stable at ${fsVel}%. Data pipeline freshness at 15 min.`,
+      })
+    }
+    if (zombies > 0) {
+      insights.push({
+        type: "info",
+        text: `${zombies} zombie epics that have never been decomposed into actionable tasks.`,
+      })
+    }
+  } else {
+    // Fallback static insights when API hasn't loaded yet
+    insights.push({ type: "warning", text: "Engineering data loading..." })
+  }
+
+  insights.push({
     type: "warning",
     text: "Analytics report turnaround measured in weeks. Self-serve coverage only ~60%.",
-  },
-  {
-    type: "success",
-    text: "FS sprint velocity stable at 88%. Data pipeline freshness at 15 min.",
-  },
-  {
-    type: "info",
-    text: "ASD has 8 zombie epics that have never been decomposed into actionable tasks.",
-  },
-]
+  })
 
-const sections: ProcessSection[] = [
-  {
-    department: "Media Buying",
-    pipelines: [
-      {
-        stages: [
-          { name: "Hypothesis" },
-          { name: "Creative" },
-          { name: "Account Setup" },
-          { name: "Launch" },
-          { name: "Monitor" },
-          { name: "Optimize/Kill" },
-        ],
-      },
-    ],
-    kpis: [
-      { label: "Overall ROI", value: "10%", status: "watch" },
-      { label: "Monthly Profit", value: "$309K", status: "ok" },
-      { label: "STOP Campaigns", value: "3", status: "stop" },
-      { label: "Avg CPA", value: "by geo", status: "neutral" },
-    ],
-  },
-  {
-    department: "Product & Engineering",
-    pipelines: [
-      {
-        label: "ASD Pipeline",
-        stages: [
-          { name: "Open", count: 40 },
-          { name: "In Progress", count: 8 },
-          { name: "Code Review", count: 13 },
-          { name: "QA", count: 9 },
-          { name: "Ready to Stage", count: 2 },
-          { name: "Done" },
-        ],
-      },
-      {
-        label: "FS Pipeline",
-        stages: [
-          { name: "To Do", count: 32 },
-          { name: "Design", count: 0 },
-          { name: "In Progress", count: 11 },
-          { name: "Code Review", count: 3 },
-          { name: "QA", count: 2 },
-          { name: "Staging", count: 0 },
-          { name: "Closed" },
-        ],
-      },
-    ],
-    kpis: [
-      { label: "Sprint Velocity ASD", value: "61%", status: "stop", sub: "avg 87%" },
-      { label: "Sprint Velocity FS", value: "88%", status: "ok", sub: "avg 91%" },
-      { label: "Bug Density ASD", value: "44%", status: "stop" },
-      { label: "Bug Density FS", value: "53%", status: "stop" },
-      { label: "Cycle Time ASD", value: "19d", status: "watch", sub: "median 13d" },
-      { label: "Cycle Time FS", value: "15d", status: "ok", sub: "median 9d" },
-      { label: "Blocked Items", value: "12", status: "stop", sub: "7 by Oleh Litvin" },
-    ],
-  },
-  {
-    department: "Analytics",
-    pipelines: [
-      {
-        stages: [
-          { name: "Request" },
-          { name: "Queue" },
-          { name: "Analysis" },
-          { name: "Review" },
-          { name: "Delivery" },
-        ],
-      },
-    ],
-    kpis: [
-      { label: "Report Turnaround", value: "weeks", status: "stop" },
-      { label: "Data Freshness", value: "15 min", status: "ok" },
-      { label: "Self-Serve Coverage", value: "~60%", status: "watch" },
-    ],
-  },
-]
+  return insights
+}
 
 /* -- Pipeline Visualization ---------------------------------------- */
 
@@ -371,13 +457,28 @@ function InfrastructureSection({ data }: { data: InfraData | null }) {
 export function ProcessesPage() {
   const { t } = useI18n()
   const [infraData, setInfraData] = useState<InfraData | null>(null)
+  const [engData, setEngData] = useState<EngineeringApiData | null>(null)
+  const [engLoading, setEngLoading] = useState(true)
 
   useEffect(() => {
     fetch("/api/mcc/airtable/infra")
       .then((r) => r.json())
       .then(setInfraData)
       .catch(() => {})
+
+    fetch("/api/mcc/jira/engineering")
+      .then((r) => r.json())
+      .then((d: EngineeringApiData) => {
+        setEngData(d)
+        setEngLoading(false)
+      })
+      .catch(() => {
+        setEngLoading(false)
+      })
   }, [])
+
+  const sections = buildSections(engData)
+  const insights = buildInsights(engData)
 
   return (
     <>
