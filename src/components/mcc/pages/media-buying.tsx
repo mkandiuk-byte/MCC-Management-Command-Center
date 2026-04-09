@@ -198,18 +198,58 @@ function SortableHead({
 /*  Tab: Overview                                                      */
 /* ------------------------------------------------------------------ */
 
+function computeDelta(current: number, previous: number): { pct: string; trend: "up" | "down" | "flat" } {
+  if (previous === 0 && current === 0) return { pct: "0%", trend: "flat" }
+  if (previous === 0) return { pct: "+100%", trend: "up" }
+  const delta = ((current - previous) / Math.abs(previous)) * 100
+  if (Math.abs(delta) < 1) return { pct: "0%", trend: "flat" }
+  const sign = delta > 0 ? "+" : ""
+  return {
+    pct: `${sign}${delta.toFixed(0)}%`,
+    trend: delta > 0 ? "up" : "down",
+  }
+}
+
 function OverviewTab({
   data,
   roi,
+  prevData,
 }: {
   data: BuyerResponse | null
   roi: RoiResponse | null
+  prevData: BuyerResponse | null
 }) {
   const { t } = useI18n()
   const totals = data?.totals
+  const prevTotals = prevData?.totals
   const buyers = data?.buyers ?? []
   const stopCount = buyers.filter((b) => b.signal === "STOP").length
   const totalCampaigns = buyers.reduce((s, b) => s + b.campaigns, 0)
+
+  // Comparisons
+  const spendDelta = totals && prevTotals ? computeDelta(totals.totalSpend, prevTotals.totalSpend) : null
+  const revDelta = totals && prevTotals ? computeDelta(totals.totalRevenue, prevTotals.totalRevenue) : null
+  const profitDelta = totals && prevTotals ? computeDelta(totals.totalProfit, prevTotals.totalProfit) : null
+  const roiDelta = totals && prevTotals ? computeDelta(totals.avgRoi, prevTotals.avgRoi) : null
+
+  // Sparkline data from daily ROI
+  const spendSpark = useMemo(() => {
+    if (!roi?.daily) return undefined
+    const sorted = [...roi.daily].sort((a, b) => a.grouping.localeCompare(b.grouping))
+    return sorted.slice(-7).map((d) => d.cost)
+  }, [roi?.daily])
+
+  const revenueSpark = useMemo(() => {
+    if (!roi?.daily) return undefined
+    const sorted = [...roi.daily].sort((a, b) => a.grouping.localeCompare(b.grouping))
+    return sorted.slice(-7).map((d) => d.revenue)
+  }, [roi?.daily])
+
+  const profitSpark = useMemo(() => {
+    if (!roi?.daily) return undefined
+    const sorted = [...roi.daily].sort((a, b) => a.grouping.localeCompare(b.grouping))
+    return sorted.slice(-7).map((d) => d.profit)
+  }, [roi?.daily])
 
   // Daily chart data sorted chronologically
   const chartData = useMemo(() => {
@@ -236,12 +276,24 @@ function OverviewTab({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-5">
-            <ScoreBox label={t("summary.totalSpend")} value={totals ? fmt(totals.totalSpend) : "..."} />
+            <ScoreBox
+              label={t("summary.totalSpend")}
+              value={totals ? fmt(totals.totalSpend) : "..."}
+              trend={spendDelta?.trend}
+              comparison={spendDelta ? `${spendDelta.pct} vs prev` : undefined}
+              sparkData={spendSpark && spendSpark.length >= 2 ? spendSpark : undefined}
+            />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <ScoreBox label={t("summary.revenue")} value={totals ? fmt(totals.totalRevenue) : "..."} />
+            <ScoreBox
+              label={t("summary.revenue")}
+              value={totals ? fmt(totals.totalRevenue) : "..."}
+              trend={revDelta?.trend}
+              comparison={revDelta ? `${revDelta.pct} vs prev` : undefined}
+              sparkData={revenueSpark && revenueSpark.length >= 2 ? revenueSpark : undefined}
+            />
           </CardContent>
         </Card>
         <Card>
@@ -250,6 +302,9 @@ function OverviewTab({
               label={t("summary.profit")}
               value={totals ? fmt(totals.totalProfit) : "..."}
               status={totals ? (totals.totalProfit >= 0 ? "ok" : "stop") : "neutral"}
+              trend={profitDelta?.trend}
+              comparison={profitDelta ? `${profitDelta.pct} vs prev` : undefined}
+              sparkData={profitSpark && profitSpark.length >= 2 ? profitSpark : undefined}
             />
           </CardContent>
         </Card>
@@ -259,6 +314,8 @@ function OverviewTab({
               label={t("common.roi")}
               value={totals ? `${totals.avgRoi}%` : "..."}
               status={totals ? (totals.avgRoi >= 15 ? "ok" : totals.avgRoi >= 0 ? "watch" : "stop") : "neutral"}
+              trend={roiDelta?.trend}
+              comparison={roiDelta ? `${roiDelta.pct} vs prev` : undefined}
             />
           </CardContent>
         </Card>
@@ -888,16 +945,25 @@ export function MediaBuyingPage() {
   const { t } = useI18n()
   const [period, setPeriod] = useState(30)
   const [buyerData, setBuyerData] = useState<BuyerResponse | null>(null)
+  const [prevBuyerData, setPrevBuyerData] = useState<BuyerResponse | null>(null)
   const [roiData, setRoiData] = useState<RoiResponse | null>(null)
   const [airtableOffers, setAirtableOffers] = useState<AirtableOffersData | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<string>("")
 
   const reload = () => {
     const to = new Date().toISOString().split("T")[0]
     const from = new Date(Date.now() - period * 86400000).toISOString().split("T")[0]
+    const prevFrom = new Date(Date.now() - period * 2 * 86400000).toISOString().split("T")[0]
+    const prevTo = new Date(Date.now() - period * 86400000).toISOString().split("T")[0]
+
     fetch(`/api/mcc/keitaro/buyers?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then(setBuyerData)
       .catch(() => {})
+    fetch(`/api/mcc/keitaro/buyers?from=${prevFrom}&to=${prevTo}`)
+      .then((r) => r.json())
+      .then(setPrevBuyerData)
+      .catch(() => setPrevBuyerData(null))
     fetch(`/api/mcc/keitaro/roi?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then(setRoiData)
@@ -906,6 +972,7 @@ export function MediaBuyingPage() {
       .then((r) => r.json())
       .then(setAirtableOffers)
       .catch(() => {})
+    setLastUpdated(new Date().toISOString())
   }
 
   useEffect(() => {
@@ -917,6 +984,7 @@ export function MediaBuyingPage() {
       <PageHeader
         title={t("buying.title")}
         subtitle={t("buying.subtitle")}
+        lastUpdated={lastUpdated || undefined}
         activePeriod={period}
         onPeriodChange={setPeriod}
         onRefresh={reload}
@@ -945,7 +1013,7 @@ export function MediaBuyingPage() {
         </TabsList>
 
         <TabsContent value={0}>
-          <OverviewTab data={buyerData} roi={roiData} />
+          <OverviewTab data={buyerData} roi={roiData} prevData={prevBuyerData} />
         </TabsContent>
         <TabsContent value={1}>
           <BuyersTab data={buyerData} />

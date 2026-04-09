@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { PageHeader } from "@/components/mcc/page-header"
 import { ScoreBox } from "@/components/mcc/score-box"
 import { DeptCard } from "@/components/mcc/dept-card"
@@ -46,6 +46,17 @@ interface EngineeringApiData {
   source: "jira_api" | "fallback"
 }
 
+interface RoiDailyRow {
+  grouping: string
+  profit: number
+  revenue: number
+  cost: number
+}
+
+interface RoiResponse {
+  daily: RoiDailyRow[]
+}
+
 function fmt(n: number): string {
   const abs = Math.abs(n)
   if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
@@ -53,29 +64,82 @@ function fmt(n: number): string {
   return `$${Math.round(n)}`
 }
 
+function computeDelta(current: number, previous: number): { pct: string; trend: "up" | "down" | "flat" } {
+  if (previous === 0 && current === 0) return { pct: "0%", trend: "flat" }
+  if (previous === 0) return { pct: "+100%", trend: "up" }
+  const delta = ((current - previous) / Math.abs(previous)) * 100
+  if (Math.abs(delta) < 1) return { pct: "0%", trend: "flat" }
+  const sign = delta > 0 ? "+" : ""
+  return {
+    pct: `${sign}${delta.toFixed(0)}%`,
+    trend: delta > 0 ? "up" : "down",
+  }
+}
+
+function fmtDelta(current: number, previous: number): string {
+  const { pct } = computeDelta(current, previous)
+  return `${pct} vs prev`
+}
+
 export function ExecutiveSummary() {
   const [buyers, setBuyers] = useState<BuyerData | null>(null)
+  const [prevBuyers, setPrevBuyers] = useState<BuyerData | null>(null)
   const [problems, setProblems] = useState<ProblemData | null>(null)
   const [infra, setInfra] = useState<InfraData | null>(null)
   const [engData, setEngData] = useState<EngineeringApiData | null>(null)
+  const [sparkData, setSparkData] = useState<number[]>([])
   const [period, setPeriod] = useState(30)
+  const [lastUpdated, setLastUpdated] = useState<string>("")
   const { t } = useI18n()
 
   const reload = () => {
     const to = new Date().toISOString().split("T")[0]
     const from = new Date(Date.now() - period * 86400000).toISOString().split("T")[0]
-    fetch(`/api/mcc/keitaro/buyers?from=${from}&to=${to}`).then(r => r.json()).then(setBuyers).catch(() => {})
+    const prevFrom = new Date(Date.now() - period * 2 * 86400000).toISOString().split("T")[0]
+    const prevTo = new Date(Date.now() - period * 86400000).toISOString().split("T")[0]
+
+    // Fetch current and previous periods in parallel
+    fetch(`/api/mcc/keitaro/buyers?from=${from}&to=${to}`)
+      .then(r => r.json())
+      .then(setBuyers)
+      .catch(() => {})
+
+    fetch(`/api/mcc/keitaro/buyers?from=${prevFrom}&to=${prevTo}`)
+      .then(r => r.json())
+      .then(setPrevBuyers)
+      .catch(() => setPrevBuyers(null))
+
     fetch("/api/mcc/problems").then(r => r.json()).then(setProblems).catch(() => {})
     fetch("/api/mcc/airtable/infra").then(r => r.json()).then(setInfra).catch(() => {})
     fetch("/api/mcc/jira/engineering").then(r => r.json()).then(setEngData).catch(() => {})
+
+    // Fetch daily ROI for sparkline
+    fetch(`/api/mcc/keitaro/roi?from=${from}&to=${to}`)
+      .then(r => r.json())
+      .then((d: RoiResponse) => {
+        if (d?.daily) {
+          const dailyProfits = d.daily.map((row) => row.profit)
+          setSparkData(dailyProfits.slice(-7))
+        }
+      })
+      .catch(() => {})
+
+    setLastUpdated(new Date().toISOString())
   }
 
   useEffect(() => { reload() }, [period])
 
   const totals = buyers?.totals
+  const prevTotals = prevBuyers?.totals
   const probs = problems?.problems ?? []
   const criticalProbs = probs.filter(p => p.severity === "critical")
   const stopBuyers = (buyers?.buyers ?? []).filter(b => b.signal === "STOP")
+
+  // Comparison helpers — graceful when prevTotals is null
+  const spendDelta = totals && prevTotals ? computeDelta(totals.totalSpend, prevTotals.totalSpend) : null
+  const revDelta = totals && prevTotals ? computeDelta(totals.totalRevenue, prevTotals.totalRevenue) : null
+  const profitDelta = totals && prevTotals ? computeDelta(totals.totalProfit, prevTotals.totalProfit) : null
+  const roiDelta = totals && prevTotals ? computeDelta(totals.avgRoi, prevTotals.avgRoi) : null
 
   // Infrastructure metrics
   const infraTasks = infra?.tasks ?? []
@@ -90,7 +154,7 @@ export function ExecutiveSummary() {
   const engVelocity = engSummary?.totalVelocity
   const engBugDensity = engSummary?.avgBugDensity
   const engBlocked = engSummary?.totalBlocked
-  const engSprintName = engData?.teams?.ASD?.sprint?.name ?? "—"
+  const engSprintName = engData?.teams?.ASD?.sprint?.name ?? "\u2014"
 
   // Engineering status coloring
   const velocityStatus: "ok" | "watch" | "stop" | "neutral" = engVelocity != null
@@ -131,7 +195,7 @@ export function ExecutiveSummary() {
   if (totals && totals.avgRoi < 10) {
     insights.push({
       type: "warning",
-      text: `Overall ROI is ${totals.avgRoi}% — below 10% target. Only ${(buyers?.buyers ?? []).filter(b => b.signal === "OK").length} of ${(buyers?.buyers ?? []).length} buyer groups are profitable.`,
+      text: `Overall ROI is ${totals.avgRoi}% \u2014 below 10% target. Only ${(buyers?.buyers ?? []).filter(b => b.signal === "OK").length} of ${(buyers?.buyers ?? []).length} buyer groups are profitable.`,
     })
   }
   if (criticalProbs.length > 0) {
@@ -154,6 +218,7 @@ export function ExecutiveSummary() {
       <PageHeader
         title={t("summary.title")}
         subtitle={t("summary.subtitle")}
+        lastUpdated={lastUpdated || undefined}
         activePeriod={period}
         onPeriodChange={setPeriod}
         onRefresh={reload}
@@ -168,20 +233,33 @@ export function ExecutiveSummary() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 stagger-children">
         <Card>
           <CardContent className="p-5">
-            <ScoreBox label={t("summary.totalSpend")} value={totals ? fmt(totals.totalSpend) : "—"} />
+            <ScoreBox
+              label={t("summary.totalSpend")}
+              value={totals ? fmt(totals.totalSpend) : "\u2014"}
+              trend={spendDelta?.trend}
+              comparison={spendDelta ? `${spendDelta.pct} vs prev` : undefined}
+            />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <ScoreBox label={t("summary.revenue")} value={totals ? fmt(totals.totalRevenue) : "—"} />
+            <ScoreBox
+              label={t("summary.revenue")}
+              value={totals ? fmt(totals.totalRevenue) : "\u2014"}
+              trend={revDelta?.trend}
+              comparison={revDelta ? `${revDelta.pct} vs prev` : undefined}
+            />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <ScoreBox
               label={t("summary.profit")}
-              value={totals ? fmt(totals.totalProfit) : "—"}
+              value={totals ? fmt(totals.totalProfit) : "\u2014"}
               status={totals ? (totals.totalProfit >= 0 ? "ok" : "stop") : "neutral"}
+              trend={profitDelta?.trend}
+              comparison={profitDelta ? `${profitDelta.pct} vs prev` : undefined}
+              sparkData={sparkData.length >= 2 ? sparkData : undefined}
             />
           </CardContent>
         </Card>
@@ -189,8 +267,10 @@ export function ExecutiveSummary() {
           <CardContent className="p-5">
             <ScoreBox
               label={t("summary.avgRoi")}
-              value={totals ? `${totals.avgRoi}%` : "—"}
+              value={totals ? `${totals.avgRoi}%` : "\u2014"}
               status={totals ? (totals.avgRoi >= 15 ? "ok" : totals.avgRoi >= 0 ? "watch" : "stop") : "neutral"}
+              trend={roiDelta?.trend}
+              comparison={roiDelta ? `${roiDelta.pct} vs prev` : undefined}
             />
           </CardContent>
         </Card>
@@ -213,9 +293,9 @@ export function ExecutiveSummary() {
           href="/buying"
           status={totals ? (totals.avgRoi >= 15 ? "green" : totals.avgRoi >= 0 ? "yellow" : "red") : "gray"}
           metrics={[
-            { label: t("common.spend"), value: totals ? fmt(totals.totalSpend) : "—" },
-            { label: t("common.profit"), value: totals ? fmt(totals.totalProfit) : "—", status: totals ? (totals.totalProfit >= 0 ? "ok" : "stop") : "neutral" },
-            { label: t("common.roi"), value: totals ? `${totals.avgRoi}%` : "—", status: totals ? (totals.avgRoi >= 15 ? "ok" : totals.avgRoi >= 0 ? "watch" : "stop") : "neutral" },
+            { label: t("common.spend"), value: totals ? fmt(totals.totalSpend) : "\u2014" },
+            { label: t("common.profit"), value: totals ? fmt(totals.totalProfit) : "\u2014", status: totals ? (totals.totalProfit >= 0 ? "ok" : "stop") : "neutral" },
+            { label: t("common.roi"), value: totals ? `${totals.avgRoi}%` : "\u2014", status: totals ? (totals.avgRoi >= 15 ? "ok" : totals.avgRoi >= 0 ? "watch" : "stop") : "neutral" },
             { label: t("buying.stopSignals"), value: stopBuyers.length, status: stopBuyers.length > 0 ? "stop" : "ok" },
           ]}
           alert={stopBuyers.length > 0 ? `${stopBuyers.length} buyer groups losing money (ROI < -30%)` : undefined}
@@ -227,9 +307,9 @@ export function ExecutiveSummary() {
           status={engCardStatus}
           metrics={[
             { label: t("eng.sprint"), value: engData ? engSprintName : "..." },
-            { label: t("eng.velocity"), value: engVelocity != null ? `${engVelocity}%` : "—", status: velocityStatus },
-            { label: t("eng.bugDensity"), value: engBugDensity != null ? `${engBugDensity}%` : "—", status: bugDensityStatus },
-            { label: t("eng.blocked"), value: engBlocked != null ? `${engBlocked}` : "—", status: blockedStatus },
+            { label: t("eng.velocity"), value: engVelocity != null ? `${engVelocity}%` : "\u2014", status: velocityStatus },
+            { label: t("eng.bugDensity"), value: engBugDensity != null ? `${engBugDensity}%` : "\u2014", status: bugDensityStatus },
+            { label: t("eng.blocked"), value: engBlocked != null ? `${engBlocked}` : "\u2014", status: blockedStatus },
           ]}
           alert={engAlertText}
         />

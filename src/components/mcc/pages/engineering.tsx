@@ -107,10 +107,6 @@ function progressColor(pct: number): string {
   return "#F55D4C"
 }
 
-function minutesAgo(isoDate: string): number {
-  return Math.max(0, Math.round((Date.now() - new Date(isoDate).getTime()) / 60000))
-}
-
 /* -- Custom Tooltip ------------------------------------------------ */
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
@@ -192,9 +188,28 @@ function SprintTab({ data }: { data: EngineeringApiResponse }) {
     FS: fs.velocityHistory[i]?.velocity ?? 0,
   }))
 
+  // Velocity comparison: current sprint vs average of previous sprints
+  function velocityComparison(history: VelocityHistoryPoint[]): { comparison?: string; trend?: "up" | "down" | "flat" } {
+    if (!history || history.length < 2) return {}
+    const current = history[history.length - 1].velocity
+    const prevEntries = history.slice(0, -1)
+    const avgPrev = prevEntries.reduce((s, h) => s + h.velocity, 0) / prevEntries.length
+    if (avgPrev === 0) return {}
+    const delta = ((current - avgPrev) / avgPrev) * 100
+    const sign = delta > 0 ? "+" : ""
+    const trend: "up" | "down" | "flat" = Math.abs(delta) < 1 ? "flat" : delta > 0 ? "up" : "down"
+    return {
+      comparison: `${sign}${delta.toFixed(0)}% vs avg prev`,
+      trend,
+    }
+  }
+
+  const asdVelComp = velocityComparison(asd.velocityHistory)
+  const fsVelComp = velocityComparison(fs.velocityHistory)
+
   const sprintCards = [
-    { project: "ASD", sprint: asd.sprint, bugDensity: asd.bugDensity, blocked: asd.blocked },
-    { project: "FS", sprint: fs.sprint, bugDensity: fs.bugDensity, blocked: fs.blocked },
+    { project: "ASD", sprint: asd.sprint, bugDensity: asd.bugDensity, blocked: asd.blocked, velComp: asdVelComp },
+    { project: "FS", sprint: fs.sprint, bugDensity: fs.bugDensity, blocked: fs.blocked, velComp: fsVelComp },
   ]
 
   return (
@@ -219,6 +234,8 @@ function SprintTab({ data }: { data: EngineeringApiResponse }) {
                     value={`${vel}%`}
                     sub={`${s.sprint.doneIssues}/${s.sprint.totalIssues} done`}
                     status={vel >= 80 ? "ok" : vel >= 65 ? "watch" : "stop"}
+                    trend={s.velComp.trend}
+                    comparison={s.velComp.comparison}
                   />
                 </div>
 
@@ -519,15 +536,12 @@ export function EngineeringPage() {
     fetchData()
   }, [fetchData])
 
-  const updatedLabel = data?.updatedAt
-    ? `Last updated: ${minutesAgo(data.updatedAt)} min ago`
-    : undefined
-
   return (
     <>
       <PageHeader
         title={t("eng.title")}
-        subtitle={updatedLabel ?? t("eng.subtitle")}
+        subtitle={t("eng.subtitle")}
+        lastUpdated={data?.updatedAt}
         onRefresh={fetchData}
       />
 
