@@ -111,8 +111,25 @@ function stageBorderColor(count: number | undefined): string {
 function buildSections(engData: EngineeringApiData | null): ProcessSection[] {
   // ASD pipeline from live data or fallback
   const asdPipeline = engData?.teams?.ASD?.pipeline
-  const asdPipelineStages: PipelineStage[] = asdPipeline
-    ? Object.entries(asdPipeline).map(([name, count]) => ({ name, count }))
+
+  // Group minor ASD statuses into a single "Queued" bucket
+  const MINOR_STATUSES = ['Reopened', 'Hold', 'Backlog']
+  const groupedAsdPipeline: Record<string, number> | undefined = asdPipeline
+    ? (() => {
+        const grouped: Record<string, number> = {}
+        for (const [status, count] of Object.entries(asdPipeline)) {
+          if (MINOR_STATUSES.includes(status)) {
+            grouped['Queued'] = (grouped['Queued'] ?? 0) + count
+          } else {
+            grouped[status] = count
+          }
+        }
+        return grouped
+      })()
+    : undefined
+
+  const asdPipelineStages: PipelineStage[] = groupedAsdPipeline
+    ? Object.entries(groupedAsdPipeline).map(([name, count]) => ({ name, count }))
     : [
         { name: "Open", count: undefined },
         { name: "In Progress", count: undefined },
@@ -275,7 +292,7 @@ function Pipeline({ stages, label }: { stages: PipelineStage[]; label?: string }
   return (
     <div className="space-y-2">
       {label && <p className="text-[12px] font-medium text-[var(--muted-foreground)]">{label}</p>}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin min-w-fit">
         {stages.map((stage, i) => (
           <div key={stage.name} className="flex items-center shrink-0">
             <div

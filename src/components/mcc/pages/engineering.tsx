@@ -283,11 +283,11 @@ function SprintTab({ data }: { data: EngineeringApiResponse }) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={velocityChartData} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
-                <XAxis dataKey="sprint" tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="sprint" tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
                 <Legend
-                  wrapperStyle={{ fontSize: 12, color: "#6B7A94" }}
+                  wrapperStyle={{ fontSize: 12, color: "hsl(220, 15%, 55%)" }}
                   iconType="circle"
                   iconSize={8}
                 />
@@ -432,10 +432,10 @@ function BugsTab({ data }: { data: EngineeringApiResponse }) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={bugChartData} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
-                <XAxis dataKey="project" tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#6B7A94", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="project" tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<BugChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "#6B7A94" }} iconType="circle" iconSize={8} />
+                <Legend wrapperStyle={{ fontSize: 12, color: "hsl(220, 15%, 55%)" }} iconType="circle" iconSize={8} />
                 <Bar dataKey="bugs" name={t("eng.bugs")} fill="#F55D4C" radius={[4, 4, 0, 0]} maxBarSize={40} />
                 <Bar dataKey="features" name="Features" fill="#4C8BF5" radius={[4, 4, 0, 0]} maxBarSize={40} />
               </BarChart>

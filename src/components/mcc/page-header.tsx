@@ -96,7 +96,7 @@ export function PageHeader({
 
       <div className="flex items-center gap-3 shrink-0">
         {onPeriodChange && (
-          <div className="flex items-center bg-[var(--muted)] border border-[var(--border)] rounded-lg p-0.5">
+          <div className="flex items-center bg-[var(--muted)] border border-[var(--border)] rounded-lg p-0.5 overflow-x-auto scrollbar-thin">
             {periods.map((p) => (
               <button
                 key={p.days}

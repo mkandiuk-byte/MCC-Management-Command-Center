@@ -30,6 +30,15 @@ export function Sidebar() {
     if (saved === "dark") { document.documentElement.classList.add("dark"); setDark(true) }
   }, [])
 
+  // Auto-collapse sidebar on narrow screens
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)")
+    if (mq.matches) setCollapsed(true)
+    const handler = (e: MediaQueryListEvent) => setCollapsed(e.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
+
   const toggleTheme = () => {
     const next = !dark
     setDark(next)

@@ -525,30 +525,32 @@ export function ProblemsPage() {
                   onClick={() => setExpandedId(isExpanded ? null : p.id)}
                   className="w-full text-left"
                 >
-                  <CardContent className="flex items-center gap-4 px-5 py-3.5">
+                  <CardContent className="flex items-center gap-4 px-5 py-3.5 flex-wrap">
                     <StatusDot status={severityDot[p.severity] ?? "gray"} />
-                    <span className="text-[14px] font-medium text-[var(--foreground)] flex-1 truncate">
+                    <span className="text-[14px] font-medium text-[var(--foreground)] flex-1 min-w-0 line-clamp-2">
                       {p.title}
                     </span>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
-                        categoryStyles[p.category as Category] ?? "bg-[var(--border)] text-[var(--muted-foreground)]"
-                      }`}
-                    >
-                      {getCategoryLabel(p.category)}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
+                          categoryStyles[p.category as Category] ?? "bg-[var(--border)] text-[var(--muted-foreground)]"
+                        }`}
+                      >
+                        {getCategoryLabel(p.category)}
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium capitalize ${
+                          statusStyles[p.status] ?? "bg-[var(--border)] text-[var(--muted-foreground)]"
+                        }`}
+                      >
+                        {p.status}
+                      </span>
+                    </div>
                     {p.owner && (
                       <span className="text-[12px] text-[var(--muted-foreground)] flex items-center gap-1 whitespace-nowrap">
                         <User className="h-3 w-3" /> {p.owner}
                       </span>
                     )}
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium capitalize ${
-                        statusStyles[p.status] ?? "bg-[var(--border)] text-[var(--muted-foreground)]"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
                     <span className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-1 whitespace-nowrap">
                       <Clock className="h-3 w-3" /> {fmtRelative(p.updated_at)}
                     </span>
@@ -559,7 +561,11 @@ export function ProblemsPage() {
                     )}
                   </CardContent>
                 </button>
-                {isExpanded && <ProblemDetail problem={p} />}
+                {isExpanded && (
+                  <div className="animate-fade-in-up">
+                    <ProblemDetail problem={p} />
+                  </div>
+                )}
               </Card>
             )
           })

@@ -358,12 +358,12 @@ function OverviewTab({
                   <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fill: "#6B7A94", fontSize: 11 }}
+                    tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 11 }}
                     axisLine={{ stroke: "currentColor", strokeOpacity: 0.06 }}
                     tickLine={false}
                   />
                   <YAxis
-                    tick={{ fill: "#6B7A94", fontSize: 11 }}
+                    tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v: number) => fmt(v)}
