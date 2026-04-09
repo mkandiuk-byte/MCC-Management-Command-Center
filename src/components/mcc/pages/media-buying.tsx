@@ -1,0 +1,819 @@
+"use client"
+
+import { useEffect, useState, useMemo } from "react"
+import { PageHeader } from "@/components/mcc/page-header"
+import { ScoreBox } from "@/components/mcc/score-box"
+import { SignalBadge, type Signal } from "@/components/mcc/signal-badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table"
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts"
+import { ArrowUpDown, Rocket, AlertOctagon, ArrowRight, Skull } from "lucide-react"
+import { useI18n } from "@/lib/mcc-i18n"
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface Buyer {
+  buyer: string
+  clicks: number
+  conversions: number
+  revenue: number
+  cost: number
+  profit: number
+  roi: number
+  cpa: number
+  campaigns: number
+  stopCampaigns: number
+  signal: string
+}
+
+interface BuyerResponse {
+  buyers: Buyer[]
+  totals: {
+    totalSpend: number
+    totalRevenue: number
+    totalProfit: number
+    avgRoi: number
+  }
+}
+
+interface RoiRow {
+  grouping: string
+  clicks: number
+  conversions: number
+  revenue: number
+  cost: number
+  profit: number
+  roi: number
+  cpa: number
+  trafficLight: string
+}
+
+interface RoiResponse {
+  byGeo: RoiRow[]
+  byOffer: RoiRow[]
+  daily: RoiRow[]
+}
+
+interface KilledCampaign {
+  name: string
+  spend: number
+  reason: string
+}
+
+interface LifecycleData {
+  tests: number
+  active: number
+  scaled: number
+  optimized: number
+  killed: number
+  total: number
+  recentlyKilled: KilledCampaign[]
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function fmt(n: number): string {
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `$${Math.round(n / 1_000)}K`
+  return `$${Math.round(n)}`
+}
+
+function fmtPct(n: number): string {
+  return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`
+}
+
+function profitColor(n: number): string {
+  return n >= 0 ? "text-[#52C67E]" : "text-[#F55D4C]"
+}
+
+function roiBorderColor(roi: number): string {
+  if (roi > 0) return "border-l-[#52C67E]"
+  if (roi >= -20) return "border-l-[#F5A623]"
+  return "border-l-[#F55D4C]"
+}
+
+/* ------------------------------------------------------------------ */
+/*  Custom Tooltip                                                     */
+/* ------------------------------------------------------------------ */
+
+interface TooltipPayloadItem {
+  name: string
+  value: number
+  color: string
+}
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: TooltipPayloadItem[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#161A24] px-3 py-2 shadow-xl">
+      <p className="text-[11px] text-[#6B7A94] mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="text-[12px] font-medium" style={{ color: p.color }}>
+          {p.name}: {fmt(p.value)}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sortable Table Header                                              */
+/* ------------------------------------------------------------------ */
+
+type SortDir = "asc" | "desc"
+
+function SortableHead({
+  label,
+  sortKey,
+  currentSort,
+  currentDir,
+  onSort,
+  className,
+}: {
+  label: string
+  sortKey: string
+  currentSort: string
+  currentDir: SortDir
+  onSort: (key: string) => void
+  className?: string
+}) {
+  return (
+    <TableHead
+      className={`cursor-pointer select-none hover:text-[#E8EFFF] text-[#6B7A94] text-[12px] font-semibold ${className ?? ""}`}
+      onClick={() => onSort(sortKey)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <ArrowUpDown
+          className={`h-3 w-3 ${currentSort === sortKey ? "text-[#4C8BF5]" : "text-[#3A4255]"}`}
+        />
+      </span>
+    </TableHead>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tab: Overview                                                      */
+/* ------------------------------------------------------------------ */
+
+function OverviewTab({
+  data,
+  roi,
+}: {
+  data: BuyerResponse | null
+  roi: RoiResponse | null
+}) {
+  const { t } = useI18n()
+  const totals = data?.totals
+  const buyers = data?.buyers ?? []
+  const stopCount = buyers.filter((b) => b.signal === "STOP").length
+  const totalCampaigns = buyers.reduce((s, b) => s + b.campaigns, 0)
+
+  // Daily chart data sorted chronologically
+  const chartData = useMemo(() => {
+    if (!roi?.daily) return []
+    return [...roi.daily]
+      .sort((a, b) => a.grouping.localeCompare(b.grouping))
+      .map((d) => ({
+        date: d.grouping.slice(5), // MM-DD
+        revenue: d.revenue,
+        cost: d.cost,
+        profit: d.profit,
+      }))
+  }, [roi?.daily])
+
+  // Top 5 geos by profit
+  const topGeos = useMemo(() => {
+    if (!roi?.byGeo) return []
+    return [...roi.byGeo].sort((a, b) => b.profit - a.profit).slice(0, 5)
+  }, [roi?.byGeo])
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Score Boxes */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox label={t("summary.totalSpend")} value={totals ? fmt(totals.totalSpend) : "..."} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox label={t("summary.revenue")} value={totals ? fmt(totals.totalRevenue) : "..."} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox
+              label={t("summary.profit")}
+              value={totals ? fmt(totals.totalProfit) : "..."}
+              status={totals ? (totals.totalProfit >= 0 ? "ok" : "stop") : "neutral"}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox
+              label={t("common.roi")}
+              value={totals ? `${totals.avgRoi}%` : "..."}
+              status={totals ? (totals.avgRoi >= 15 ? "ok" : totals.avgRoi >= 0 ? "watch" : "stop") : "neutral"}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox label={t("buying.activeCampaigns")} value={totals ? totalCampaigns : "..."} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox
+              label={t("buying.stopSignals")}
+              value={stopCount}
+              status={stopCount > 0 ? "stop" : "ok"}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Daily Trend Chart */}
+      {chartData.length > 0 && (
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="text-[13px] font-semibold text-[#E8EFFF] mb-4">
+              {t("buying.dailyTrend")}
+            </h3>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4C8BF5" stopOpacity={0.15} />
+                      <stop offset="100%" stopColor="#4C8BF5" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="fillProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#52C67E" stopOpacity={0.15} />
+                      <stop offset="100%" stopColor="#52C67E" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: "#6B7A94", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#6B7A94", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => fmt(v)}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    name={t("summary.revenue")}
+                    stroke="#4C8BF5"
+                    strokeWidth={2}
+                    fill="url(#fillRevenue)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="profit"
+                    name={t("summary.profit")}
+                    stroke="#52C67E"
+                    strokeWidth={2}
+                    fill="url(#fillProfit)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top 5 Geos */}
+      {topGeos.length > 0 && (
+        <div>
+          <h3 className="text-[13px] font-semibold text-[#E8EFFF] mb-3">{t("buying.topGeosByProfit")}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {topGeos.map((geo) => (
+              <Card
+                key={geo.grouping}
+                className={`border-l-[3px] ${roiBorderColor(geo.roi)}`}
+              >
+                <CardContent className="p-4">
+                  <p className="text-[14px] font-semibold text-[#E8EFFF]">
+                    {geo.grouping}
+                  </p>
+                  <p className={`text-[20px] font-bold mt-1 ${profitColor(geo.roi)}`}>
+                    {geo.roi.toFixed(1)}%
+                  </p>
+                  <div className="flex items-center gap-3 mt-2 text-[12px] text-[#6B7A94]">
+                    <span>{t("buying.spend")} {fmt(geo.cost)}</span>
+                    <span className={profitColor(geo.profit)}>
+                      {t("summary.profit")} {fmt(geo.profit)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tab: Buyers                                                        */
+/* ------------------------------------------------------------------ */
+
+function BuyersTab({ data }: { data: BuyerResponse | null }) {
+  const { t } = useI18n()
+  const [sortKey, setSortKey] = useState("profit")
+  const [sortDir, setSortDir] = useState<SortDir>("desc")
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(key)
+      setSortDir("desc")
+    }
+  }
+
+  const sorted = useMemo(() => {
+    if (!data?.buyers) return []
+    return [...data.buyers].sort((a, b) => {
+      const av = a[sortKey as keyof Buyer]
+      const bv = b[sortKey as keyof Buyer]
+      if (typeof av === "number" && typeof bv === "number") {
+        return sortDir === "asc" ? av - bv : bv - av
+      }
+      return sortDir === "asc"
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av))
+    })
+  }, [data?.buyers, sortKey, sortDir])
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+              <SortableHead label={t("buying.buyer")} sortKey="buyer" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
+              <SortableHead label={t("buying.spend")} sortKey="cost" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("summary.revenue")} sortKey="revenue" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("summary.profit")} sortKey="profit" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("common.roi")} sortKey="roi" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("common.cpa")} sortKey="cpa" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("buying.campaigns")} sortKey="campaigns" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <TableHead className="text-[#6B7A94] text-[12px] font-semibold">{t("buying.signal")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((b) => (
+              <TableRow
+                key={b.buyer}
+                className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+              >
+                <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
+                  {b.buyer}
+                </TableCell>
+                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(b.cost)}</TableCell>
+                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(b.revenue)}</TableCell>
+                <TableCell className={`text-[13px] font-medium ${profitColor(b.profit)}`}>
+                  {fmt(b.profit)}
+                </TableCell>
+                <TableCell className={`text-[13px] font-medium ${profitColor(b.roi)}`}>
+                  {fmtPct(b.roi)}
+                </TableCell>
+                <TableCell className="text-[13px] text-[#C1CCDE]">${b.cpa}</TableCell>
+                <TableCell className="text-[13px] text-[#C1CCDE]">{b.campaigns}</TableCell>
+                <TableCell>
+                  <SignalBadge signal={b.signal as Signal} />
+                </TableCell>
+              </TableRow>
+            ))}
+            {sorted.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-[#6B7A94] py-12">
+                  Loading buyer data...
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tab: Geo                                                           */
+/* ------------------------------------------------------------------ */
+
+function GeoTab({ roi }: { roi: RoiResponse | null }) {
+  const { t } = useI18n()
+  const geos = useMemo(() => {
+    if (!roi?.byGeo) return []
+    return [...roi.byGeo].sort((a, b) => b.profit - a.profit)
+  }, [roi?.byGeo])
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {geos.map((geo) => (
+        <Card
+          key={geo.grouping}
+          className={`border-l-[3px] ${roiBorderColor(geo.roi)}`}
+        >
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[15px] font-semibold text-[#E8EFFF]">
+                  {geo.grouping}
+                </p>
+                <p className={`text-[26px] font-bold mt-1 ${profitColor(geo.roi)}`}>
+                  {geo.roi.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div>
+                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("buying.spend")}</p>
+                <p className="text-[14px] font-medium text-[#C1CCDE] mt-0.5">{fmt(geo.cost)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("summary.profit")}</p>
+                <p className={`text-[14px] font-medium mt-0.5 ${profitColor(geo.profit)}`}>
+                  {fmt(geo.profit)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("buying.clicks")}</p>
+                <p className="text-[14px] font-medium text-[#C1CCDE] mt-0.5">
+                  {geo.clicks.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[#6B7A94] uppercase tracking-wide">{t("buying.conversions")}</p>
+                <p className="text-[14px] font-medium text-[#C1CCDE] mt-0.5">
+                  {geo.conversions.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+      {geos.length === 0 && (
+        <Card className="col-span-full">
+          <CardContent className="p-12 text-center text-[#6B7A94]">
+            Loading geo data...
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tab: Offers                                                        */
+/* ------------------------------------------------------------------ */
+
+function OffersTab({ roi }: { roi: RoiResponse | null }) {
+  const { t } = useI18n()
+  const [sortKey, setSortKey] = useState("revenue")
+  const [sortDir, setSortDir] = useState<SortDir>("desc")
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(key)
+      setSortDir("desc")
+    }
+  }
+
+  const offers = useMemo(() => {
+    if (!roi?.byOffer) return []
+    return [...roi.byOffer]
+      .sort((a, b) => {
+        const av = a[sortKey as keyof RoiRow]
+        const bv = b[sortKey as keyof RoiRow]
+        if (typeof av === "number" && typeof bv === "number") {
+          return sortDir === "asc" ? av - bv : bv - av
+        }
+        return sortDir === "asc"
+          ? String(av).localeCompare(String(bv))
+          : String(bv).localeCompare(String(av))
+      })
+      .slice(0, 15)
+  }, [roi?.byOffer, sortKey, sortDir])
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b-[rgba(255,255,255,0.06)] hover:bg-transparent">
+              <SortableHead label={t("buying.offer")} sortKey="grouping" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-5" />
+              <SortableHead label={t("summary.revenue")} sortKey="revenue" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("buying.cost")} sortKey="cost" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("summary.profit")} sortKey="profit" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("common.roi")} sortKey="roi" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortableHead label={t("buying.conversions")} sortKey="conversions" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {offers.map((o) => (
+              <TableRow
+                key={o.grouping}
+                className="border-b-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]"
+              >
+                <TableCell className="pl-5 text-[13px] font-medium text-[#E8EFFF]">
+                  {o.grouping}
+                </TableCell>
+                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.revenue)}</TableCell>
+                <TableCell className="text-[13px] text-[#C1CCDE]">{fmt(o.cost)}</TableCell>
+                <TableCell className={`text-[13px] font-medium ${profitColor(o.profit)}`}>
+                  {fmt(o.profit)}
+                </TableCell>
+                <TableCell className={`text-[13px] font-medium ${profitColor(o.roi)}`}>
+                  {fmtPct(o.roi)}
+                </TableCell>
+                <TableCell className="text-[13px] text-[#C1CCDE]">
+                  {o.conversions.toLocaleString()}
+                </TableCell>
+              </TableRow>
+            ))}
+            {offers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-[#6B7A94] py-12">
+                  Loading offer data...
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tab: Operations                                                    */
+/* ------------------------------------------------------------------ */
+
+function OperationsTab({ data }: { data: BuyerResponse | null }) {
+  const { t } = useI18n()
+  const [lifecycle, setLifecycle] = useState<LifecycleData | null>(null)
+
+  useEffect(() => {
+    fetch("/api/mcc/keitaro/campaign-lifecycle")
+      .then((r) => r.json())
+      .then(setLifecycle)
+      .catch(() => {})
+  }, [])
+
+  const total = lifecycle?.total ?? 0
+  const successRate =
+    total > 0
+      ? (((lifecycle?.scaled ?? 0) + (lifecycle?.optimized ?? 0)) / total) * 100
+      : 0
+
+  const funnelStages = [
+    { label: "Tests", value: lifecycle?.tests ?? 0, color: "#4C8BF5" },
+    { label: "Active", value: lifecycle?.active ?? 0, color: "#F5A623" },
+    { label: "Scaled", value: lifecycle?.scaled ?? 0, color: "#52C67E" },
+  ]
+
+  const recentlyKilled = lifecycle?.recentlyKilled?.slice(0, 5) ?? []
+
+  return (
+    <div className="space-y-6">
+      {/* Score Boxes */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox label="Tests" value={lifecycle?.tests ?? "..."} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox label="Active" value={lifecycle?.active ?? "..."} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox
+              label="Scaled"
+              value={lifecycle?.scaled ?? "..."}
+              status={lifecycle ? (lifecycle.scaled > 0 ? "ok" : "neutral") : "neutral"}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox
+              label="Killed"
+              value={lifecycle?.killed ?? "..."}
+              status={lifecycle ? (lifecycle.killed > 5 ? "stop" : lifecycle.killed > 0 ? "watch" : "ok") : "neutral"}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <ScoreBox
+              label="Success Rate"
+              value={lifecycle ? `${successRate.toFixed(1)}%` : "..."}
+              status={lifecycle ? (successRate >= 30 ? "ok" : successRate >= 15 ? "watch" : "stop") : "neutral"}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Funnel Visualization */}
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-[13px] font-semibold text-[var(--foreground)] mb-5">
+            Campaign Pipeline
+          </h3>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {funnelStages.map((stage, i) => (
+              <div key={stage.label} className="flex items-center gap-2">
+                <div
+                  className="flex flex-col items-center justify-center rounded-xl px-6 py-4 min-w-[120px] border"
+                  style={{
+                    backgroundColor: `${stage.color}10`,
+                    borderColor: `${stage.color}30`,
+                  }}
+                >
+                  <span className="text-[11px] font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+                    {stage.label}
+                  </span>
+                  <span
+                    className="text-[28px] font-bold mt-1"
+                    style={{ color: stage.color }}
+                  >
+                    {stage.value}
+                  </span>
+                </div>
+                {i < funnelStages.length - 1 && (
+                  <ArrowRight className="h-5 w-5 text-[var(--muted-foreground)] shrink-0" />
+                )}
+              </div>
+            ))}
+          </div>
+          {total > 0 && (
+            <p className="text-center text-[12px] text-[var(--muted-foreground)] mt-4">
+              {total} total campaigns tracked &middot; {lifecycle?.killed ?? 0} killed &middot; {successRate.toFixed(1)}% success rate
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recently Killed */}
+      {recentlyKilled.length > 0 && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Skull className="h-4 w-4 text-[var(--error)]" />
+              <h3 className="text-[13px] font-semibold text-[var(--foreground)]">
+                Recently Killed
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {recentlyKilled.map((c, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 rounded-lg border border-[rgba(255,255,255,0.06)] px-4 py-3 bg-[rgba(245,93,76,0.04)]"
+                >
+                  <span className="text-[13px] font-medium text-[var(--foreground)] flex-1 truncate max-w-[240px]">
+                    {c.name}
+                  </span>
+                  <span className="text-[12px] text-[var(--muted-foreground)] shrink-0">
+                    {fmt(c.spend)} spent
+                  </span>
+                  <span className="text-[12px] text-[var(--error)] shrink-0 max-w-[200px] truncate">
+                    {c.reason}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Page                                                          */
+/* ------------------------------------------------------------------ */
+
+export function MediaBuyingPage() {
+  const { t } = useI18n()
+  const [period, setPeriod] = useState(30)
+  const [buyerData, setBuyerData] = useState<BuyerResponse | null>(null)
+  const [roiData, setRoiData] = useState<RoiResponse | null>(null)
+
+  const reload = () => {
+    const to = new Date().toISOString().split("T")[0]
+    const from = new Date(Date.now() - period * 86400000).toISOString().split("T")[0]
+    fetch(`/api/mcc/keitaro/buyers?from=${from}&to=${to}`)
+      .then((r) => r.json())
+      .then(setBuyerData)
+      .catch(() => {})
+    fetch(`/api/mcc/keitaro/roi?from=${from}&to=${to}`)
+      .then((r) => r.json())
+      .then(setRoiData)
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    reload()
+  }, [period])
+
+  return (
+    <>
+      <PageHeader
+        title={t("buying.title")}
+        subtitle={t("buying.subtitle")}
+        activePeriod={period}
+        onPeriodChange={setPeriod}
+        onRefresh={reload}
+      />
+
+      <Tabs defaultValue={0}>
+        <TabsList
+          variant="line"
+          className="mb-6 border-b border-[rgba(255,255,255,0.06)] pb-0"
+        >
+          <TabsTrigger value={0} className="text-[13px] px-4 py-2">
+            {t("buying.overview")}
+          </TabsTrigger>
+          <TabsTrigger value={1} className="text-[13px] px-4 py-2">
+            {t("buying.buyers")}
+          </TabsTrigger>
+          <TabsTrigger value={2} className="text-[13px] px-4 py-2">
+            {t("buying.geo")}
+          </TabsTrigger>
+          <TabsTrigger value={3} className="text-[13px] px-4 py-2">
+            {t("buying.offers")}
+          </TabsTrigger>
+          <TabsTrigger value={4} className="text-[13px] px-4 py-2">
+            {t("buying.operations")}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={0}>
+          <OverviewTab data={buyerData} roi={roiData} />
+        </TabsContent>
+        <TabsContent value={1}>
+          <BuyersTab data={buyerData} />
+        </TabsContent>
+        <TabsContent value={2}>
+          <GeoTab roi={roiData} />
+        </TabsContent>
+        <TabsContent value={3}>
+          <OffersTab roi={roiData} />
+        </TabsContent>
+        <TabsContent value={4}>
+          <OperationsTab data={buyerData} />
+        </TabsContent>
+      </Tabs>
+    </>
+  )
+}
