@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { PageHeader } from "@/components/mcc/page-header"
+import { ScoreBox } from "@/components/mcc/score-box"
 import { StatusDot } from "@/components/mcc/status-dot"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -30,10 +31,14 @@ interface Problem {
   owner: string
   hypothesis: string
   metric_name: string
-  baseline_value: number
-  current_value: number
+  baseline_value: number | null
+  current_value: number | null
   created_at: string
   updated_at: string
+  testCount?: number
+  positiveTests?: number
+  negativeTests?: number
+  totalUpdates?: number
 }
 
 interface ProblemUpdate {
@@ -379,6 +384,18 @@ export function ProblemsPage() {
     return acc
   }, {})
 
+  // Hypothesis success rate: computed from enriched test result counts
+  const totalTestResults = problems.reduce((sum, p) => sum + (p.testCount ?? 0), 0)
+  const totalPositive = problems.reduce((sum, p) => sum + (p.positiveTests ?? 0), 0)
+  const successRate = totalTestResults > 0 ? Math.round((totalPositive / totalTestResults) * 100) : null
+  const successRateStatus: "ok" | "watch" | "stop" | "neutral" =
+    successRate === null ? "neutral" : successRate > 50 ? "ok" : successRate > 25 ? "watch" : "stop"
+
+  // Problems with metrics: count problems that have both baseline_value and current_value set
+  const problemsWithMetrics = problems.filter(
+    (p) => p.baseline_value != null && p.current_value != null,
+  ).length
+
   const getCategoryLabel = (cat: string): string => {
     const labels = categoryLabels[cat as Category]
     return labels ? labels[lang] : cat.replace(/_/g, " ")
@@ -419,6 +436,26 @@ export function ProblemsPage() {
             <span className="text-[12px] text-[#6B7A94] capitalize">{status}</span>
           </div>
         ))}
+
+        {/* Hypothesis Success Rate */}
+        <div className="px-3 py-1.5 rounded-lg bg-[#12151C] border border-[rgba(255,255,255,0.06)]">
+          <ScoreBox
+            label="Success Rate"
+            value={successRate !== null ? `${successRate}%` : "—"}
+            status={successRateStatus}
+            sub={totalTestResults > 0 ? `${totalPositive}/${totalTestResults} tests` : "no tests yet"}
+          />
+        </div>
+
+        {/* Problems with Metrics */}
+        <div className="px-3 py-1.5 rounded-lg bg-[#12151C] border border-[rgba(255,255,255,0.06)]">
+          <ScoreBox
+            label="With Metrics"
+            value={`${problemsWithMetrics}/${total}`}
+            status={total > 0 && problemsWithMetrics / total > 0.5 ? "ok" : problemsWithMetrics > 0 ? "watch" : "stop"}
+            sub="measuring impact"
+          />
+        </div>
       </div>
 
       {/* Filters */}

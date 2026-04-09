@@ -14,7 +14,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table"
-import { Users } from "lucide-react"
+import { Users, ShieldCheck } from "lucide-react"
 import { useI18n } from "@/lib/mcc-i18n"
 
 /* -- Types --------------------------------------------------------- */
@@ -566,6 +566,149 @@ function PeopleSection({ data }: { data: PeopleApiData | null }) {
   )
 }
 
+/* -- SLA Compliance Section ----------------------------------------- */
+
+const SLA_HOURS: Record<string, number> = {
+  "Open": 24,
+  "Backlog": 168,       // 1 week
+  "In Progress": 336,   // 2 weeks
+  "Code Review": 72,    // 3 days
+  "QA": 48,             // 2 days
+  "Ready to Stage": 24,
+}
+
+function slaStatusFromCount(count: number): "ok" | "watch" | "stop" {
+  if (count <= 5) return "ok"
+  if (count <= 10) return "watch"
+  return "stop"
+}
+
+function slaStatusColor(status: "ok" | "watch" | "stop"): string {
+  if (status === "ok") return "#52C67E"
+  if (status === "watch") return "#F5A623"
+  return "#F55D4C"
+}
+
+function slaBgColor(status: "ok" | "watch" | "stop"): string {
+  if (status === "ok") return "rgba(82,198,126,0.08)"
+  if (status === "watch") return "rgba(245,166,35,0.08)"
+  return "rgba(245,93,76,0.08)"
+}
+
+function slaBorderColor(status: "ok" | "watch" | "stop"): string {
+  if (status === "ok") return "rgba(82,198,126,0.2)"
+  if (status === "watch") return "rgba(245,166,35,0.2)"
+  return "rgba(245,93,76,0.2)"
+}
+
+function formatSlaHours(hours: number): string {
+  if (hours < 24) return `${hours}h`
+  const days = hours / 24
+  if (days === 7) return "1 week"
+  if (days === 14) return "2 weeks"
+  return `${days}d`
+}
+
+function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null }) {
+  // Merge both team pipelines to get combined counts per stage
+  const asdPipeline = engData?.teams?.ASD?.pipeline ?? {}
+  const fsPipeline = engData?.teams?.FS?.pipeline ?? {}
+
+  // Build SLA entries only for stages that have defined SLA targets
+  const slaEntries = Object.entries(SLA_HOURS).map(([stage, targetHours]) => {
+    const asdCount = asdPipeline[stage] ?? 0
+    const fsCount = fsPipeline[stage] ?? 0
+    const totalCount = asdCount + fsCount
+    const status = slaStatusFromCount(totalCount)
+    return { stage, targetHours, count: totalCount, status }
+  })
+
+  // Overall compliance: % of stages that are "ok"
+  const okCount = slaEntries.filter((e) => e.status === "ok").length
+  const complianceRate = slaEntries.length > 0 ? Math.round((okCount / slaEntries.length) * 100) : 0
+  const complianceStatus: "ok" | "watch" | "stop" =
+    complianceRate >= 80 ? "ok" : complianceRate >= 50 ? "watch" : "stop"
+
+  if (!engData) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldCheck className="h-4 w-4 text-[var(--muted-foreground)]" />
+            <h3 className="text-[15px] font-semibold text-[var(--foreground)]">SLA Compliance</h3>
+          </div>
+          <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[var(--muted-foreground)]" />
+            <h3 className="text-[15px] font-semibold text-[var(--foreground)]">SLA Compliance</h3>
+          </div>
+          <ScoreBox
+            label="Overall Compliance"
+            value={`${complianceRate}%`}
+            status={complianceStatus}
+          />
+        </div>
+
+        <p className="text-[11px] text-[var(--muted-foreground)]">
+          Item counts per pipeline stage across ASD + FS teams. High item counts signal potential SLA breaches.
+        </p>
+
+        {/* SLA cards row */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {slaEntries.map((entry) => (
+            <div
+              key={entry.stage}
+              className="flex flex-col items-center justify-center rounded-lg px-3 py-3 border"
+              style={{
+                backgroundColor: slaBgColor(entry.status),
+                borderColor: slaBorderColor(entry.status),
+              }}
+            >
+              <span className="text-[11px] font-medium text-[#C1CCDE] text-center leading-tight whitespace-nowrap">
+                {entry.stage}
+              </span>
+              <span
+                className="text-[18px] font-bold mt-1"
+                style={{ color: slaStatusColor(entry.status) }}
+              >
+                {entry.count}
+              </span>
+              <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                SLA: {formatSlaHours(entry.targetHours)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center gap-4 pt-2">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-[#52C67E]" />
+            <span className="text-[11px] text-[var(--muted-foreground)]">0-5 items</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-[#F5A623]" />
+            <span className="text-[11px] text-[var(--muted-foreground)]">6-10 items</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-[#F55D4C]" />
+            <span className="text-[11px] text-[var(--muted-foreground)]">&gt;10 items</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 /* -- Main Export ---------------------------------------------------- */
 
 export function ProcessesPage() {
@@ -613,6 +756,7 @@ export function ProcessesPage() {
         {sections.map((s) => (
           <SectionCard key={s.department} section={s} />
         ))}
+        <SlaComplianceSection engData={engData} />
         <InfrastructureSection data={infraData} />
         <PeopleSection data={peopleData} />
       </div>

@@ -31,7 +31,36 @@ export async function GET(request: NextRequest) {
       params,
     )
 
-    return NextResponse.json({ problems: result.rows })
+    // Enrich each problem with test result stats from its updates
+    const enrichedProblems = await Promise.all(
+      result.rows.map(async (p: Record<string, unknown>) => {
+        try {
+          const updatesResult = await query(
+            'SELECT * FROM mcc.problem_updates WHERE problem_id = $1',
+            [p.id],
+          )
+          const updates = updatesResult.rows
+          const testResults = updates.filter(
+            (u: Record<string, unknown>) => u.update_type === 'test_result',
+          )
+          return {
+            ...p,
+            testCount: testResults.length,
+            positiveTests: testResults.filter(
+              (u: Record<string, unknown>) => u.outcome === 'positive',
+            ).length,
+            negativeTests: testResults.filter(
+              (u: Record<string, unknown>) => u.outcome === 'negative',
+            ).length,
+            totalUpdates: updates.length,
+          }
+        } catch {
+          return { ...p, testCount: 0, positiveTests: 0, negativeTests: 0, totalUpdates: 0 }
+        }
+      }),
+    )
+
+    return NextResponse.json({ problems: enrichedProblems })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
