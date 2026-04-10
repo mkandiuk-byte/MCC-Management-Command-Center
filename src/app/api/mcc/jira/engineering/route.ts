@@ -252,11 +252,16 @@ async function buildTeamData(project: string): Promise<TeamData> {
   const velocityHistory: VelocityEntry[] = await Promise.all(velocityFetches)
 
   // --- 3. Bug density (90 days) -------------------------------------------
+  // Numerator: only parent Bug issues (excludes Bug-Subtask / Sub-bug subtasks
+  //            which can outnumber stories and push the ratio above 100%).
+  // Denominator: all non-subtask issues so the metric stays comparable.
   const [bugCount90d, totalCount90d] = await Promise.all([
     jiraCount(
-      `project=${project} AND issuetype in (Bug,"Bug-Subtask","Sub-bug") AND created >= "-90d"`,
+      `project=${project} AND issuetype = Bug AND created >= "-90d"`,
     ),
-    jiraCount(`project=${project} AND created >= "-90d"`),
+    jiraCount(
+      `project=${project} AND issuetype not in subTaskIssueTypes() AND created >= "-90d"`,
+    ),
   ])
   const bugDensity: BugDensity = {
     bugCount90d,
