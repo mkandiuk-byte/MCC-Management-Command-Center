@@ -27,10 +27,15 @@ export function Sidebar() {
 
   useEffect(() => {
     const saved = localStorage.getItem("mcc-theme")
-    if (saved === "dark") { document.documentElement.classList.add("dark"); setDark(true) }
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark")
+      setDark(true)
+    } else {
+      document.documentElement.classList.remove("dark")
+      setDark(false)
+    }
   }, [])
 
-  // Auto-collapse sidebar on narrow screens
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)")
     if (mq.matches) setCollapsed(true)
@@ -50,21 +55,27 @@ export function Sidebar() {
     href === "/" ? pathname === "/" : pathname.startsWith(href)
 
   return (
-    <aside className={cn(
-      "flex flex-col shrink-0 transition-all duration-500",
-      collapsed ? "w-[60px]" : "w-[230px]"
-    )}>
+    <aside
+      className={cn(
+        "flex flex-col shrink-0 transition-all duration-500 backdrop-blur-xl",
+        collapsed ? "w-[60px]" : "w-[230px]"
+      )}
+      style={{
+        fontFamily: "'Satoshi', ui-sans-serif, system-ui, sans-serif",
+        backgroundColor: "color-mix(in srgb, var(--background) 85%, transparent)",
+      }}
+    >
       {/* Logo */}
       <div className={cn("flex items-center h-[60px] px-4", collapsed && "justify-center px-2")}>
         {!collapsed ? (
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-2xl bg-gradient-to-br from-[#5B6BF5] via-[#8B6BF5] to-[#C084FC] flex items-center justify-center shadow-lg shadow-[rgba(91,107,245,0.3)] animate-float">
+            <div className="h-9 w-9 rounded-2xl bg-[var(--primary)] flex items-center justify-center shadow-lg animate-float" style={{ boxShadow: "0 4px 16px oklch(0.56 0.2 275 / 0.3)" }}>
               <span className="text-[13px] font-bold text-white">M</span>
             </div>
             <span className="text-[16px] font-bold tracking-tight text-[var(--foreground)]">MCC</span>
           </div>
         ) : (
-          <div className="h-9 w-9 rounded-2xl bg-gradient-to-br from-[#5B6BF5] via-[#8B6BF5] to-[#C084FC] flex items-center justify-center shadow-lg shadow-[rgba(91,107,245,0.3)] animate-float">
+          <div className="h-9 w-9 rounded-2xl bg-[var(--primary)] flex items-center justify-center shadow-lg animate-float" style={{ boxShadow: "0 4px 16px oklch(0.56 0.2 275 / 0.3)" }}>
             <span className="text-[13px] font-bold text-white">M</span>
           </div>
         )}
@@ -82,12 +93,14 @@ export function Sidebar() {
                 "group flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[13px] font-medium transition-all duration-300 relative overflow-hidden",
                 collapsed && "justify-center px-2",
                 active
-                  ? "bg-[var(--sidebar-accent)] text-[var(--accent)] shadow-sm shadow-[rgba(91,107,245,0.08)]"
+                  ? "bg-[var(--sidebar-accent)] text-[var(--accent)] shadow-sm"
                   : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]"
               )}
+              style={active ? { boxShadow: "0 1px 4px oklch(0.56 0.2 275 / 0.06)" } : undefined}
             >
+              {/* Active indicator — bottom bar instead of left stripe */}
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-[var(--accent)] to-[var(--chart-3)]" />
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-[var(--accent)]" />
               )}
               <item.icon className={cn(
                 "shrink-0 transition-transform duration-300 group-hover:scale-110",

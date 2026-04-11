@@ -28,6 +28,7 @@ const translations = {
   "summary.avgRoi": { uk: "Сер. ROI", en: "Avg ROI" },
   "summary.openProblems": { uk: "Відкриті проблеми", en: "Open Problems" },
   "summary.critical": { uk: "критичних", en: "critical" },
+  "summary.topGeos": { uk: "ТОП ГЕО", en: "TOP GEOS" },
   "summary.activeProblems": { uk: "Активні проблеми", en: "Active Problems" },
   "summary.investigating": { uk: "Розслідується", en: "Investigating" },
   "summary.testing": { uk: "Тестування", en: "Testing" },

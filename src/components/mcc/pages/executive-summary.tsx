@@ -81,12 +81,14 @@ function pct(n: number): string {
 }
 
 function computeDelta(current: number, previous: number): { pct: string; trend: "up" | "down" | "flat" } {
-  if (previous === 0 && current === 0) return { pct: "0%", trend: "flat" }
-  if (previous === 0) return { pct: "+100%", trend: "up" }
+  if (previous === 0 && current === 0) return { pct: "\u2014", trend: "flat" }
+  if (previous === 0) return { pct: `\u2191${fmt(current)}`, trend: "up" }
   const delta = ((current - previous) / Math.abs(previous)) * 100
-  if (Math.abs(delta) < 1) return { pct: "0%", trend: "flat" }
-  const sign = delta > 0 ? "+" : ""
-  return { pct: `${sign}${delta.toFixed(0)}%`, trend: delta > 0 ? "up" : "down" }
+  if (Math.abs(delta) < 1) return { pct: "\u2014", trend: "flat" }
+  return {
+    pct: delta > 0 ? `\u2191${delta.toFixed(0)}%` : `\u2193${Math.abs(delta).toFixed(0)}%`,
+    trend: delta > 0 ? "up" : "down",
+  }
 }
 
 type Status = "ok" | "watch" | "stop" | "neutral"
@@ -137,19 +139,20 @@ function Sparkline({ data }: { data: number[] }) {
   const max = Math.max(...data)
   const min = Math.min(...data)
   const range = max - min || 1
-  const w = 48
-  const h = 16
+  const w = 64
+  const h = 24
   const pts = data
-    .map((v, i) => `${(i / (data.length - 1)) * w},${h - 1 - ((v - min) / range) * (h - 2)}`)
+    .map((v, i) => `${(i / (data.length - 1)) * w},${h - 2 - ((v - min) / range) * (h - 4)}`)
     .join(" ")
   const up = data[data.length - 1] >= data[0]
+  const strokeColor = up ? "oklch(0.7 0.18 155)" : "oklch(0.62 0.22 25)"
   return (
     <svg width={w} height={h} className="inline-block shrink-0 ml-1">
       <polyline
         points={pts}
         fill="none"
-        stroke={up ? "oklch(0.7 0.18 155)" : "oklch(0.62 0.22 25)"}
-        strokeWidth="1.5"
+        stroke={strokeColor}
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -311,10 +314,10 @@ export function ExecutiveSummary() {
   const probs = problems?.problems ?? []
   const stopBuyers = (buyers?.buyers ?? []).filter(b => b.signal === "STOP")
 
-  const profitDelta = totals && prevTotals ? computeDelta(totals.totalProfit, prevTotals.totalProfit) : null
-  const roiDelta = totals && prevTotals ? computeDelta(totals.avgRoi, prevTotals.avgRoi) : null
-  const spendDelta = totals && prevTotals ? computeDelta(totals.totalSpend, prevTotals.totalSpend) : null
-  const revDelta = totals && prevTotals ? computeDelta(totals.totalRevenue, prevTotals.totalRevenue) : null
+  const profitDelta = totals && prevTotals ? computeDelta(totals.totalProfit, prevTotals.totalProfit) : { pct: "\u2014", trend: "flat" as const }
+  const roiDelta = totals && prevTotals ? computeDelta(totals.avgRoi, prevTotals.avgRoi) : { pct: "\u2014", trend: "flat" as const }
+  const spendDelta = totals && prevTotals ? computeDelta(totals.totalSpend, prevTotals.totalSpend) : { pct: "\u2014", trend: "flat" as const }
+  const revDelta = totals && prevTotals ? computeDelta(totals.totalRevenue, prevTotals.totalRevenue) : { pct: "\u2014", trend: "flat" as const }
 
   const engSummary = engData?.summary
   const engVelocity = engSummary?.totalVelocity
@@ -526,13 +529,14 @@ export function ExecutiveSummary() {
                   </span>
                   <Sparkline data={profitSpark} />
                 </div>
-                {profitDelta && (
-                  <div className="flex items-center gap-1 mt-3">
-                    {profitDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
-                    {profitDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
-                    <span className="text-body-sm text-[var(--muted-foreground)]">{profitDelta.pct} vs prev</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 mt-3">
+                  {profitDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
+                  {profitDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
+                  <span className="text-body-sm" style={{ color: profitDelta.trend === "up" ? "var(--success)" : profitDelta.trend === "down" ? "var(--error)" : "var(--muted-foreground)" }}>
+                    {profitDelta.pct}
+                  </span>
+                  {profitDelta.trend !== "flat" && <span className="text-body-sm text-[var(--muted-foreground)]">vs prev</span>}
+                </div>
               </div>
 
               {/* ROI — primary signal (1fr, 28px) */}
@@ -552,13 +556,14 @@ export function ExecutiveSummary() {
                   </span>
                   <Sparkline data={roiSpark} />
                 </div>
-                {roiDelta && (
-                  <div className="flex items-center gap-1 mt-2">
-                    {roiDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
-                    {roiDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
-                    <span className="text-body-sm text-[var(--muted-foreground)]">{roiDelta.pct} vs prev</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 mt-2">
+                  {roiDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
+                  {roiDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
+                  <span className="text-body-sm" style={{ color: roiDelta.trend === "up" ? "var(--success)" : roiDelta.trend === "down" ? "var(--error)" : "var(--muted-foreground)" }}>
+                    {roiDelta.pct}
+                  </span>
+                  {roiDelta.trend !== "flat" && <span className="text-body-sm text-[var(--muted-foreground)]">vs prev</span>}
+                </div>
               </div>
 
               {/* STOP signals — primary signal (1fr, 28px) */}
@@ -633,9 +638,9 @@ export function ExecutiveSummary() {
                   </span>
                   <Sparkline data={spendSpark} />
                 </div>
-                {spendDelta && (
-                  <span className="text-[11px] text-[var(--muted-foreground)]">{spendDelta.pct} vs prev</span>
-                )}
+                <span className="text-[11px]" style={{ color: spendDelta.trend === "up" ? "var(--warning)" : spendDelta.trend === "down" ? "var(--success)" : "var(--muted-foreground)" }}>
+                  {spendDelta.pct}{spendDelta.trend !== "flat" ? " vs prev" : ""}
+                </span>
               </div>
 
               {/* Revenue */}
@@ -654,9 +659,9 @@ export function ExecutiveSummary() {
                   </span>
                   <Sparkline data={revenueSpark} />
                 </div>
-                {revDelta && (
-                  <span className="text-[11px] text-[var(--muted-foreground)]">{revDelta.pct} vs prev</span>
-                )}
+                <span className="text-[11px]" style={{ color: revDelta.trend === "up" ? "var(--success)" : revDelta.trend === "down" ? "var(--error)" : "var(--muted-foreground)" }}>
+                  {revDelta.pct}{revDelta.trend !== "flat" ? " vs prev" : ""}
+                </span>
               </div>
 
               {/* Bugs */}
@@ -705,12 +710,12 @@ export function ExecutiveSummary() {
           )}
 
           {/* ──────────────────────────────────────────────────────
-              SECTION A — ACTIVE FIRES
+              SECTION A — TOP GEOS
               FIX 4: Compressed geo table (top 3 + see all)
               FIX 5: Progressively more compact
               ────────────────────────────────────────────────────── */}
           <Section delay={200} className="mb-8">
-            <SectionHeader label="Active Fires" href="/mcc/buying" />
+            <SectionHeader label={t("summary.topGeos")} href="/mcc/buying" />
             <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mt-3">
               {/* Geo profit table — bare rows */}
               <div>
@@ -788,7 +793,7 @@ export function ExecutiveSummary() {
               ────────────────────────────────────────────────────── */}
           <Section delay={260} className="mb-8">
             <SectionHeader label="Engineering Pulse" href="/mcc/engineering" />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3 overflow-hidden">
               {/* Sprint progress — two thin bars */}
               <div className="flex flex-col gap-3">
                 {asdSprint && (
@@ -843,15 +848,15 @@ export function ExecutiveSummary() {
               </div>
 
               {/* Top bottleneck people — avatar initials + bar + count */}
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2.5 min-w-0 overflow-hidden">
                 {bottlenecks.map((b, i) => {
                   const countStatus: Status = b.count >= 7 ? "stop" : b.count >= 4 ? "watch" : "ok"
                   return (
-                    <div key={i} className="flex items-center gap-3">
+                    <div key={i} className="flex items-center gap-3 min-w-0">
                       <div className="w-6 h-6 rounded-full bg-[var(--muted)] flex items-center justify-center shrink-0">
                         <span className="text-[9px] font-bold text-[var(--muted-foreground)]">{b.initials}</span>
                       </div>
-                      <span className="text-[12px] text-[var(--foreground)] min-w-[72px]">{b.name}</span>
+                      <span className="text-[12px] text-[var(--foreground)] min-w-[72px] max-w-[90px] truncate">{b.name}</span>
                       <div className="flex-1 h-1 bg-[var(--muted)] rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
