@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { PageHeader } from "@/components/mcc/page-header"
 import { ScoreBox } from "@/components/mcc/score-box"
 import { InsightsCard, type Insight } from "@/components/mcc/insights-card"
@@ -14,6 +14,15 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table"
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts"
 import { Users, ShieldCheck } from "lucide-react"
 import { useI18n } from "@/lib/mcc-i18n"
 
@@ -847,6 +856,199 @@ function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null 
   )
 }
 
+/* -- Infrastructure Tickets Types ---------------------------------- */
+
+interface TicketDayEntry {
+  date: string
+  count: number
+}
+
+interface TicketData {
+  ticketsPerDay: TicketDayEntry[]
+  ticketsByProject: Record<string, number>
+  pwaTickets: number
+  avgResolveTimeDays: number
+  openTickets: number
+  resolvedLast30d: number
+  totalCreated30d: number
+  avgPerDay: number
+  updatedAt: string
+  source: string
+}
+
+/* -- Infrastructure Tickets Tooltip -------------------------------- */
+
+function TicketChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: { name: string; value: number; color: string }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-lg border border-[var(--input)] bg-[var(--popover)] px-3 py-2 shadow-xl">
+      <p className="text-[11px] text-[var(--muted-foreground)] mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="text-[12px] font-medium" style={{ color: p.color }}>
+          {p.name}: {p.value}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+/* -- Infrastructure Tickets Section -------------------------------- */
+
+function InfrastructureTicketsSection({ data }: { data: TicketData | null }) {
+  const chartData = useMemo(() => {
+    if (!data?.ticketsPerDay) return []
+    return data.ticketsPerDay.map((d) => ({
+      date: d.date.slice(5),
+      tickets: d.count,
+    }))
+  }, [data?.ticketsPerDay])
+
+  if (!data) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-4">
+            INFRASTRUCTURE TICKETS
+          </h3>
+          <Skeleton className="h-[200px] w-full" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const projectEntries = Object.entries(data.ticketsByProject)
+
+  return (
+    <Card className="backdrop-blur-md bg-[var(--card)]/80">
+      <CardContent className="p-6">
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-5">
+          INFRASTRUCTURE TICKETS
+        </h3>
+
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left: area chart */}
+          <div className="flex-1 min-w-0">
+            {chartData.length > 0 && (
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="fillTickets" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--accent, #4C8BF5)" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="var(--accent, #4C8BF5)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="currentColor" strokeOpacity={0.04} strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 10 }}
+                      axisLine={{ stroke: "currentColor", strokeOpacity: 0.04 }}
+                      tickLine={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={30}
+                    />
+                    <Tooltip content={<TicketChartTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="tickets"
+                      name="Tickets"
+                      stroke="var(--accent, #4C8BF5)"
+                      strokeWidth={2}
+                      fill="url(#fillTickets)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Right: stacked metrics list */}
+          <div className="w-full lg:w-[260px] shrink-0">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Total created (30d)
+                </span>
+                <span className="text-[14px] font-bold text-[var(--foreground)]">
+                  {data.totalCreated30d}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Avg per day
+                </span>
+                <span className="text-[14px] font-bold text-[var(--foreground)]">
+                  {data.avgPerDay}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  PWA tickets
+                </span>
+                <span className="text-[14px] font-bold text-[var(--foreground)]">
+                  {data.pwaTickets}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Avg resolve time
+                </span>
+                <span className="text-[14px] font-bold text-[var(--foreground)]">
+                  {data.avgResolveTimeDays} days
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Open tickets
+                </span>
+                <span
+                  className="text-[14px] font-bold"
+                  style={{
+                    color: data.openTickets > 100
+                      ? "var(--error)"
+                      : data.openTickets > 50
+                        ? "var(--warning)"
+                        : "var(--foreground)",
+                  }}
+                >
+                  {data.openTickets}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  By project
+                </span>
+                <span className="text-[13px] font-medium text-[var(--foreground)]">
+                  {projectEntries.map(([key, val], i) => (
+                    <span key={key}>
+                      {key}{" "}
+                      <span className="font-bold">{val}</span>
+                      {i < projectEntries.length - 1 ? " \u00B7 " : ""}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 /* -- Department Flow Narrative ------------------------------------- */
 
 function DepartmentFlowNarrative() {
@@ -871,6 +1073,7 @@ export function ProcessesPage() {
   const [engData, setEngData] = useState<EngineeringApiData | null>(null)
   const [engLoading, setEngLoading] = useState(true)
   const [peopleData, setPeopleData] = useState<PeopleApiData | null>(null)
+  const [ticketData, setTicketData] = useState<TicketData | null>(null)
 
   useEffect(() => {
     fetch("/api/mcc/airtable/infra")
@@ -891,6 +1094,11 @@ export function ProcessesPage() {
     fetch("/api/mcc/airtable/people")
       .then((r) => r.json())
       .then(setPeopleData)
+      .catch(() => {})
+
+    fetch("/api/mcc/jira/tickets")
+      .then((r) => r.json())
+      .then(setTicketData)
       .catch(() => {})
   }, [])
 
@@ -914,6 +1122,7 @@ export function ProcessesPage() {
           <SectionCard key={s.department} section={s} />
         ))}
         <SlaComplianceSection engData={engData} />
+        <InfrastructureTicketsSection data={ticketData} />
         <InfrastructureSection data={infraData} />
         <PeopleSection data={peopleData} />
       </div>

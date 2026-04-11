@@ -794,14 +794,55 @@ function OffersTab({
 /*  Tab: Operations                                                    */
 /* ------------------------------------------------------------------ */
 
+interface DailyCampaignsData {
+  campaignsPerDay: { date: string; created: number; killed: number }[]
+  campaignsBySource: Record<string, number>
+  totalActive: number
+  totalKilled30d: number
+  totalCreated30d: number
+  avgCreatedPerDay: number
+  avgKilledPerDay: number
+  killRate: number
+  updatedAt: string
+  source: string
+}
+
+/* Tooltip for daily campaigns chart */
+function DailyCampaignsTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: { name: string; value: number; color: string }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-lg border border-[var(--input)] bg-[var(--popover)] px-3 py-2 shadow-xl">
+      <p className="text-[11px] text-[var(--muted-foreground)] mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="text-[12px] font-medium" style={{ color: p.color }}>
+          {p.name}: {p.value}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 function OperationsTab({ data }: { data: BuyerResponse | null }) {
   const { t } = useI18n()
   const [lifecycle, setLifecycle] = useState<LifecycleData | null>(null)
+  const [dailyCampaigns, setDailyCampaigns] = useState<DailyCampaignsData | null>(null)
 
   useEffect(() => {
     fetch("/api/mcc/keitaro/campaign-lifecycle")
       .then((r) => r.json())
       .then(setLifecycle)
+      .catch(() => {})
+    fetch("/api/mcc/keitaro/campaigns-daily")
+      .then((r) => r.json())
+      .then(setDailyCampaigns)
       .catch(() => {})
   }, [])
 
@@ -819,8 +860,108 @@ function OperationsTab({ data }: { data: BuyerResponse | null }) {
 
   const recentlyKilled = lifecycle?.recentlyKilled?.slice(0, 5) ?? []
 
+  const chartData = useMemo(() => {
+    if (!dailyCampaigns?.campaignsPerDay) return []
+    return dailyCampaigns.campaignsPerDay.map((d) => ({
+      date: d.date.slice(5), // MM-DD
+      created: d.created,
+      killed: d.killed,
+    }))
+  }, [dailyCampaigns?.campaignsPerDay])
+
   return (
     <div className="space-y-6">
+      {/* Campaigns Per Day */}
+      {chartData.length > 0 && (
+        <Card className="backdrop-blur-md bg-[var(--card)]/80">
+          <CardContent className="p-5">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-4">
+              CAMPAIGNS PER DAY
+            </h3>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="fillCreated" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--accent, #4C8BF5)" stopOpacity={0.15} />
+                      <stop offset="100%" stopColor="var(--accent, #4C8BF5)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="fillKilled" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--error, #E5484D)" stopOpacity={0.12} />
+                      <stop offset="100%" stopColor="var(--error, #E5484D)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="currentColor" strokeOpacity={0.04} strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 11 }}
+                    axisLine={{ stroke: "currentColor", strokeOpacity: 0.04 }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "hsl(220, 15%, 55%)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<DailyCampaignsTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="created"
+                    name="Created"
+                    stroke="var(--accent, #4C8BF5)"
+                    strokeWidth={2}
+                    fill="url(#fillCreated)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="killed"
+                    name="Killed"
+                    stroke="var(--error, #E5484D)"
+                    strokeWidth={2}
+                    fill="url(#fillKilled)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Compact metrics row */}
+            <div className="flex flex-wrap items-center gap-6 mt-4 text-[13px]">
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Avg created/day
+                </span>
+                <span className="ml-2 text-[14px] font-bold text-[var(--foreground)]">
+                  {dailyCampaigns?.avgCreatedPerDay ?? "..."}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Avg killed/day
+                </span>
+                <span className="ml-2 text-[14px] font-bold text-[var(--foreground)]">
+                  {dailyCampaigns?.avgKilledPerDay ?? "..."}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Kill rate
+                </span>
+                <span className="ml-2 text-[14px] font-bold text-[var(--foreground)]">
+                  {dailyCampaigns ? `${dailyCampaigns.killRate}%` : "..."}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Active total
+                </span>
+                <span className="ml-2 text-[14px] font-bold text-[var(--foreground)]">
+                  {dailyCampaigns?.totalActive?.toLocaleString() ?? "..."}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Score Boxes */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card>
