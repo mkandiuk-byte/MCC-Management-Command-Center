@@ -11,7 +11,6 @@ import {
   TrendingUp,
   TrendingDown,
   Ban,
-  Server,
   Shield,
   Users,
   Lock,
@@ -22,6 +21,7 @@ import {
   RefreshCw,
   Zap,
   Clock,
+  ChevronRight,
 } from "lucide-react"
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -95,7 +95,7 @@ function statusColor(s: Status): string {
   return { ok: "var(--success)", watch: "var(--warning)", stop: "var(--error)", neutral: "var(--foreground)" }[s]
 }
 
-/* Mini sparkline — ONLY for Profit and Revenue where daily trend data exists */
+/* Mini sparkline — for money KPIs with daily trend data */
 function Sparkline({ data }: { data: number[] }) {
   if (!data || data.length < 2) return null
   const max = Math.max(...data)
@@ -121,6 +121,37 @@ function Sparkline({ data }: { data: number[] }) {
   )
 }
 
+/* FIX 1: Loading skeleton */
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      {/* Insight skeleton */}
+      <div className="rounded-2xl bg-[var(--muted)] h-20" />
+      {/* KPI skeletons — hero row */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
+        <div className="rounded-2xl bg-[var(--muted)] h-32" />
+        {Array.from({ length: 3 }).map((_, i) => <div key={i} className="rounded-2xl bg-[var(--muted)] h-28" />)}
+      </div>
+      {/* KPI skeletons — secondary row */}
+      <div className="grid grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="rounded-2xl bg-[var(--muted)] h-20" />)}
+      </div>
+    </div>
+  )
+}
+
+/* FIX 1: Per-section error indicator */
+function DataError({ source, onRetry }: { source: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px]"
+         style={{ background: "var(--warning-muted)", color: "var(--warning)" }}>
+      <AlertTriangle className="h-3.5 w-3.5" />
+      <span>{source} unavailable</span>
+      <button onClick={onRetry} className="underline ml-1">Retry</button>
+    </div>
+  )
+}
+
 /* Staggered section wrapper */
 function Section({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
   return (
@@ -129,6 +160,17 @@ function Section({ children, delay = 0, className = "" }: { children: React.Reac
       style={{ animationDelay: `${delay}ms`, animationFillMode: "backwards" }}
     >
       {children}
+    </div>
+  )
+}
+
+/* FIX 3: Clickable section header with drill-down affordance */
+function SectionHeader({ label, href }: { label: string; href: string }) {
+  const router = useRouter()
+  return (
+    <div className="flex items-center gap-1 cursor-pointer group" onClick={() => router.push(href)}>
+      <span className="text-section-header">{label}</span>
+      <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
     </div>
   )
 }
@@ -153,18 +195,24 @@ export function ExecutiveSummary() {
   const [buyers, setBuyers] = useState<BuyerData | null>(null)
   const [prevBuyers, setPrevBuyers] = useState<BuyerData | null>(null)
   const [problems, setProblems] = useState<ProblemData | null>(null)
-  const [infra, setInfra] = useState<InfraData | null>(null)
   const [engData, setEngData] = useState<EngineeringApiData | null>(null)
   const [peopleCount, setPeopleCount] = useState<number | null>(null)
   const [profitSpark, setProfitSpark] = useState<number[]>([])
   const [revenueSpark, setRevenueSpark] = useState<number[]>([])
+  const [spendSpark, setSpendSpark] = useState<number[]>([])
+  const [roiSpark, setRoiSpark] = useState<number[]>([])
   const [period, setPeriod] = useState(30)
   const [lastUpdated, setLastUpdated] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [errors, setErrors] = useState<Set<string>>(new Set())
   const { t } = useI18n()
   const router = useRouter()
 
   /* ─── Data fetch — all endpoints in parallel ─────────────── */
   const reload = useCallback(() => {
+    setLoading(true)
+    setErrors(new Set())
+
     const to = new Date().toISOString().split("T")[0]
     const from = new Date(Date.now() - period * 86400000).toISOString().split("T")[0]
     const prevFrom = new Date(Date.now() - period * 2 * 86400000).toISOString().split("T")[0]
@@ -176,26 +224,44 @@ export function ExecutiveSummary() {
       fetch(`/api/mcc/keitaro/roi?from=${from}&to=${to}`).then(r => r.json()),
       fetch("/api/mcc/problems").then(r => r.json()),
       fetch("/api/mcc/jira/engineering").then(r => r.json()),
-      fetch("/api/mcc/airtable/infra").then(r => r.json()),
       fetch("/api/mcc/airtable/people").then(r => r.json()),
-    ]).then(([buyersR, prevR, roiR, probR, engR, infraR, peopleR]) => {
+    ]).then(([buyersR, prevR, roiR, probR, engR, peopleR]) => {
+      const failed = new Set<string>()
+
       if (buyersR.status === "fulfilled") setBuyers(buyersR.value)
+      else failed.add("Buyers")
+
       if (prevR.status === "fulfilled") setPrevBuyers(prevR.value)
+      else failed.add("Previous period")
+
       if (roiR.status === "fulfilled") {
         const d = roiR.value as RoiResponse
         if (d?.daily) {
           const last7 = d.daily.slice(-7)
           setProfitSpark(last7.map(r => r.profit))
           setRevenueSpark(last7.map(r => r.revenue))
+          setSpendSpark(last7.map(r => r.cost))
+          setRoiSpark(last7.map(r => r.revenue > 0 && r.cost > 0 ? ((r.revenue - r.cost) / r.cost) * 100 : 0))
         }
+      } else {
+        failed.add("ROI")
       }
+
       if (probR.status === "fulfilled") setProblems(probR.value)
+      else failed.add("Problems")
+
       if (engR.status === "fulfilled") setEngData(engR.value)
-      if (infraR.status === "fulfilled") setInfra(infraR.value)
+      else failed.add("Engineering")
+
       if (peopleR.status === "fulfilled") {
         const pd = peopleR.value as PeopleData
         setPeopleCount(pd?.count ?? null)
+      } else {
+        failed.add("People")
       }
+
+      setErrors(failed)
+      setLoading(false)
     })
 
     setLastUpdated(new Date().toISOString())
@@ -227,10 +293,10 @@ export function ExecutiveSummary() {
   const bugStatus: Status = engBugDensity != null ? (engBugDensity <= 30 ? "ok" : engBugDensity <= 45 ? "watch" : "stop") : "neutral"
   const blockedStatus: Status = engBlocked != null ? (engBlocked === 0 ? "ok" : engBlocked <= 5 ? "watch" : "stop") : "neutral"
 
-  /* Geo profit rows — top 5 */
+  /* FIX 4: Geo profit rows — top 3 (compressed) */
   const geoRows = (buyers?.buyers ?? [])
     .sort((a, b) => b.profit - a.profit)
-    .slice(0, 5)
+    .slice(0, 3)
     .map(b => ({
       name: b.buyer,
       profit: b.profit,
@@ -252,9 +318,10 @@ export function ExecutiveSummary() {
     .slice(0, 3)
   const maxWip = Math.max(...bottlenecks.map(b => b.count), 1)
 
-  /* Infra numbers */
-  const infraTasks = infra?.tasks ?? []
-  const infraServices = infra?.services ?? []
+  /* FIX 4: Problem chips — limit to 4 + "+N more" */
+  const activeProblems = probs.filter(p => p.status !== "resolved")
+  const visibleProblems = activeProblems.slice(0, 4)
+  const hiddenProblemCount = activeProblems.length - 4
 
   /* ─── Insight computation ─────────────────────────────────── */
   type InsightLevel = "critical" | "warning" | "positive"
@@ -322,456 +389,488 @@ export function ExecutiveSummary() {
         onRefresh={reload}
       />
 
-      {/* ──────────────────────────────────────────────────────
-          INSIGHT STRIP — not a card, just tinted text
-          ────────────────────────────────────────────────────── */}
-      {(insights.length > 0 || recommendation) && (
-        <Section delay={30} className="mb-6">
-          <div className={`rounded-xl px-5 py-3.5 ${insightBg}`}>
-            {insights.map((ins, i) => {
-              const iconColor = ins.level === "critical" ? "var(--error)" : ins.level === "warning" ? "var(--warning)" : "var(--success)"
-              return (
-                <div key={i} className="flex items-start gap-2.5 py-0.5">
-                  <InsightIcon className="h-3.5 w-3.5 shrink-0 mt-[3px]" style={{ color: iconColor }} />
-                  <p className="text-[13px] leading-relaxed text-[var(--foreground)]">{ins.text}</p>
-                </div>
-              )
-            })}
-            {recommendation && (
-              <div className="flex items-start gap-2.5 mt-1 pt-1">
-                <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-[3px]" style={{ color: "var(--accent)" }} />
-                <p className="text-[12px] leading-relaxed italic" style={{ color: "var(--muted-foreground)" }}>
-                  {recommendation}
-                </p>
+      {/* FIX 1: Show skeleton while loading */}
+      {loading && <LoadingSkeleton />}
+
+      {!loading && (
+        <>
+          {/* ──────────────────────────────────────────────────────
+              INSIGHT STRIP — FIX 5: more prominent, top border, larger text
+              ────────────────────────────────────────────────────── */}
+          {(insights.length > 0 || recommendation) && (
+            <Section delay={0} className="mb-6">
+              <div className={`rounded-xl px-5 py-4 ${insightBg}`} style={{ borderTop: "2px solid var(--border)" }}>
+                {insights.map((ins, i) => {
+                  const iconColor = ins.level === "critical" ? "var(--error)" : ins.level === "warning" ? "var(--warning)" : "var(--success)"
+                  return (
+                    <div key={i} className="flex items-start gap-2.5 py-0.5">
+                      <InsightIcon className="h-3.5 w-3.5 shrink-0 mt-[3px]" style={{ color: iconColor }} />
+                      <p className="text-[15px] leading-relaxed text-[var(--foreground)]">{ins.text}</p>
+                    </div>
+                  )
+                })}
+                {recommendation && (
+                  <div
+                    className="flex items-start gap-2.5 mt-2 px-3 py-2.5 rounded-lg"
+                    style={{ background: "var(--muted)" }}
+                  >
+                    <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-[3px]" style={{ color: "var(--accent)" }} />
+                    <p className="text-[12px] leading-relaxed font-medium" style={{ color: "var(--muted-foreground)" }}>
+                      {recommendation}
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </Section>
-      )}
+            </Section>
+          )}
 
-      {/* ──────────────────────────────────────────────────────
-          ROW 1 — MONEY: Profit, ROI, Spend, Revenue
-          ────────────────────────────────────────────────────── */}
-      <Section delay={80} className="mb-3">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">
-          {/* Profit — hero metric */}
-          <div
-            onClick={() => router.push("/mcc/buying")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-            style={{ animationDelay: "0ms", transform: "scale(0.97)", animation: "scale-in 0.5s cubic-bezier(0.22,1,0.36,1) forwards" }}
-          >
-            <p className="text-caption mb-2">{t("summary.profit")}</p>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-kpi" style={{ color: statusColor(profitStatus) }}>
-                {totals ? fmt(totals.totalProfit) : "\u2014"}
-              </span>
-              <Sparkline data={profitSpark} />
-            </div>
-            {profitDelta && (
-              <div className="flex items-center gap-1 mt-2">
-                {profitDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
-                {profitDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
-                <span className="text-body-sm text-[var(--muted-foreground)]">{profitDelta.pct} vs prev</span>
-              </div>
-            )}
-          </div>
+          {/* FIX 1: Per-section errors for buyer data */}
+          {errors.has("Buyers") && (
+            <Section delay={80} className="mb-3">
+              <DataError source="Buyer data" onRetry={reload} />
+            </Section>
+          )}
 
-          {/* ROI */}
-          <div
-            onClick={() => router.push("/mcc/buying")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-          >
-            <p className="text-caption mb-2">{t("summary.avgRoi")}</p>
-            <span className="text-kpi" style={{ color: statusColor(roiStatus) }}>
-              {totals ? `${totals.avgRoi}%` : "\u2014"}
-            </span>
-            {roiDelta && (
-              <div className="flex items-center gap-1 mt-2">
-                {roiDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
-                {roiDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
-                <span className="text-body-sm text-[var(--muted-foreground)]">{roiDelta.pct} vs prev</span>
-              </div>
-            )}
-          </div>
-
-          {/* Spend — informational, no status color */}
-          <div
-            onClick={() => router.push("/mcc/buying")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-          >
-            <p className="text-caption mb-2">{t("summary.totalSpend")}</p>
-            <span className="text-kpi text-[var(--foreground)]">
-              {totals ? fmt(totals.totalSpend) : "\u2014"}
-            </span>
-            {spendDelta && (
-              <div className="flex items-center gap-1 mt-2">
-                <span className="text-body-sm text-[var(--muted-foreground)]">{spendDelta.pct} vs prev</span>
-              </div>
-            )}
-          </div>
-
-          {/* Revenue — informational, sparkline for trend */}
-          <div
-            onClick={() => router.push("/mcc/buying")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-          >
-            <p className="text-caption mb-2">{t("summary.revenue")}</p>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-kpi text-[var(--foreground)]">
-                {totals ? fmt(totals.totalRevenue) : "\u2014"}
-              </span>
-              <Sparkline data={revenueSpark} />
-            </div>
-            {revDelta && (
-              <div className="flex items-center gap-1 mt-2">
-                <span className="text-body-sm text-[var(--muted-foreground)]">{revDelta.pct} vs prev</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </Section>
-
-      {/* ──────────────────────────────────────────────────────
-          ROW 2 — OPERATIONS: STOP, Velocity, Bugs, Blocked
-          ────────────────────────────────────────────────────── */}
-      <Section delay={140} className="mb-10">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">
-          {/* STOP signals */}
-          <div
-            onClick={() => router.push("/mcc/buying")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-          >
-            <p className="text-caption mb-2">STOP</p>
-            <span className="text-kpi" style={{ color: statusColor(stopStatus) }}>
-              {stopBuyers.length}
-            </span>
-            <p className="text-body-sm text-[var(--muted-foreground)] mt-2">
-              {stopBuyers.length > 0 ? `${fmt(stopBuyers.reduce((s, b) => s + Math.abs(b.profit), 0))}/mo` : "all clear"}
-            </p>
-          </div>
-
-          {/* Velocity */}
-          <div
-            onClick={() => router.push("/mcc/engineering")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-          >
-            <p className="text-caption mb-2">{t("eng.velocity")}</p>
-            <span className="text-kpi" style={{ color: statusColor(velocityStatus) }}>
-              {engVelocity != null ? pct(engVelocity) : "\u2014"}
-            </span>
-            <p className="text-body-sm text-[var(--muted-foreground)] mt-2">avg 75%</p>
-          </div>
-
-          {/* Bug Density */}
-          <div
-            onClick={() => router.push("/mcc/engineering")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-          >
-            <p className="text-caption mb-2">{t("eng.bugDensity")}</p>
-            <span className="text-kpi" style={{ color: statusColor(bugStatus) }}>
-              {engBugDensity != null ? pct(engBugDensity) : "\u2014"}
-            </span>
-            <p className="text-body-sm text-[var(--muted-foreground)] mt-2">target &lt;30%</p>
-          </div>
-
-          {/* Blocked */}
-          <div
-            onClick={() => router.push("/mcc/engineering")}
-            className="
-              rounded-2xl border border-white/50 dark:border-white/[0.07]
-              bg-[var(--card)] backdrop-blur-xl
-              p-5 cursor-pointer
-              transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
-            "
-          >
-            <p className="text-caption mb-2">{t("eng.blocked")}</p>
-            <span className="text-kpi" style={{ color: statusColor(blockedStatus) }}>
-              {engBlocked ?? "\u2014"}
-            </span>
-            <p className="text-body-sm text-[var(--muted-foreground)] mt-2">across teams</p>
-          </div>
-        </div>
-      </Section>
-
-      {/* ──────────────────────────────────────────────────────
-          SECTION A — ACTIVE FIRES
-          ────────────────────────────────────────────────────── */}
-      <Section delay={200} className="mb-10">
-        <p className="text-section-header mb-4">Active Fires</p>
-        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-          {/* Geo profit table — bare rows, no card wrapper */}
-          <div>
-            {geoRows.map((g, i) => (
+          {/* ──────────────────────────────────────────────────────
+              ROW 1 — HERO KPIs: Profit (2fr), ROI, STOP, Velocity
+              FIX 2: Hierarchical layout — profit as hero
+              FIX 5: Sparklines on all money KPIs
+              ────────────────────────────────────────────────────── */}
+          <Section delay={80} className="mb-3">
+            <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
+              {/* Profit — HERO metric (2fr, larger text) */}
               <div
-                key={i}
                 onClick={() => router.push("/mcc/buying")}
                 className="
-                  flex items-center justify-between gap-4 px-4 py-3 rounded-xl cursor-pointer
-                  transition-colors duration-150 hover:bg-white/30 dark:hover:bg-white/[0.04]
+                  rounded-2xl border border-white/50 dark:border-white/[0.07]
+                  bg-[var(--card)] backdrop-blur-xl
+                  p-6 cursor-pointer
+                  transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
+                "
+                style={{ animationDelay: "0ms", transform: "scale(0.97)", animation: "scale-in 0.5s cubic-bezier(0.22,1,0.36,1) forwards" }}
+              >
+                <div className="flex items-center gap-1 cursor-pointer group" onClick={(e) => { e.stopPropagation(); router.push("/mcc/buying") }}>
+                  <span className="text-caption" title="Revenue minus cost across all campaigns">{t("summary.profit")}</span>
+                  <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                </div>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="font-bold tabular-nums" style={{ fontSize: "2.5rem", lineHeight: 1, color: statusColor(profitStatus) }}>
+                    {totals ? fmt(totals.totalProfit) : "\u2014"}
+                  </span>
+                  <Sparkline data={profitSpark} />
+                </div>
+                {profitDelta && (
+                  <div className="flex items-center gap-1 mt-3">
+                    {profitDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
+                    {profitDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
+                    <span className="text-body-sm text-[var(--muted-foreground)]">{profitDelta.pct} vs prev</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ROI — primary signal (1fr, 28px) */}
+              <div
+                onClick={() => router.push("/mcc/buying")}
+                className="
+                  rounded-2xl border border-white/50 dark:border-white/[0.07]
+                  bg-[var(--card)] backdrop-blur-xl
+                  p-5 cursor-pointer
+                  transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
                 "
               >
-                <span className="text-[13px] font-medium text-[var(--foreground)]">{g.name}</span>
-                <div className="flex items-center gap-5">
-                  <span
-                    className="text-[14px] font-bold tabular-nums"
-                    style={{ color: g.profit >= 0 ? "var(--success)" : "var(--error)" }}
-                  >
-                    {g.profit >= 0 ? "+" : ""}{fmt(g.profit)}
+                <span className="text-caption" title="Profit / cost x 100. Target: >15%">{t("summary.avgRoi")}</span>
+                <div className="flex items-baseline gap-1 mt-2">
+                  <span className="font-bold tabular-nums" style={{ fontSize: "1.75rem", lineHeight: 1, color: statusColor(roiStatus) }}>
+                    {totals ? `${totals.avgRoi}%` : "\u2014"}
                   </span>
-                  <span className="text-[12px] tabular-nums text-[var(--muted-foreground)] min-w-[52px] text-right">
-                    ROI {g.roi}%
+                  <Sparkline data={roiSpark} />
+                </div>
+                {roiDelta && (
+                  <div className="flex items-center gap-1 mt-2">
+                    {roiDelta.trend === "up" && <TrendingUp className="h-3 w-3" style={{ color: "var(--success)" }} />}
+                    {roiDelta.trend === "down" && <TrendingDown className="h-3 w-3" style={{ color: "var(--error)" }} />}
+                    <span className="text-body-sm text-[var(--muted-foreground)]">{roiDelta.pct} vs prev</span>
+                  </div>
+                )}
+              </div>
+
+              {/* STOP signals — primary signal (1fr, 28px) */}
+              <div
+                onClick={() => router.push("/mcc/buying")}
+                className="
+                  rounded-2xl border border-white/50 dark:border-white/[0.07]
+                  bg-[var(--card)] backdrop-blur-xl
+                  p-5 cursor-pointer
+                  transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
+                "
+              >
+                <span className="text-caption" title="Campaigns with ROI below -30%. Losing money.">STOP</span>
+                <div className="mt-2">
+                  <span className="font-bold tabular-nums" style={{ fontSize: "1.75rem", lineHeight: 1, color: statusColor(stopStatus) }}>
+                    {stopBuyers.length}
                   </span>
                 </div>
+                <p className="text-body-sm text-[var(--muted-foreground)] mt-2">
+                  {stopBuyers.length > 0 ? `${fmt(stopBuyers.reduce((s, b) => s + Math.abs(b.profit), 0))}/mo` : "all clear"}
+                </p>
               </div>
-            ))}
-            {geoRows.length === 0 && (
-              <p className="text-[12px] text-[var(--muted-foreground)] px-4 py-6">No geo data available</p>
-            )}
-          </div>
 
-          {/* STOP signals — tinted area, NOT a card with stripe */}
-          {stopBuyers.length > 0 ? (
-            <div className="rounded-2xl bg-[var(--error-muted)] p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Ban className="h-3.5 w-3.5" style={{ color: "var(--error)" }} />
-                <p className="text-caption" style={{ color: "var(--error)" }}>STOP Signals</p>
+              {/* Velocity — primary signal (1fr, 28px) */}
+              <div
+                onClick={() => router.push("/mcc/engineering")}
+                className="
+                  rounded-2xl border border-white/50 dark:border-white/[0.07]
+                  bg-[var(--card)] backdrop-blur-xl
+                  p-5 cursor-pointer
+                  transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-black/[0.05] dark:hover:shadow-black/20
+                "
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-caption" title="Sprint tasks completed / total. Target: >75%">{t("eng.velocity")}</span>
+                  {engData?.source === "fallback" && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--warning-muted)", color: "var(--warning)" }}>
+                      Stale data
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <span className="font-bold tabular-nums" style={{ fontSize: "1.75rem", lineHeight: 1, color: statusColor(velocityStatus) }}>
+                    {engVelocity != null ? pct(engVelocity) : "\u2014"}
+                  </span>
+                </div>
+                <p className="text-body-sm text-[var(--muted-foreground)] mt-2">avg 75%</p>
               </div>
-              <div className="flex flex-col gap-1.5">
-                {stopBuyers.map((sb, i) => (
-                  <div key={i} className="flex items-center justify-between py-1.5">
-                    <span className="text-[13px] font-medium" style={{ color: "var(--error)" }}>{sb.buyer}</span>
-                    <span className="text-[13px] font-bold tabular-nums" style={{ color: "var(--error)" }}>{fmt(sb.profit)}</span>
+            </div>
+          </Section>
+
+          {/* ──────────────────────────────────────────────────────
+              ROW 2 — SECONDARY CONTEXT: Spend, Revenue, Bugs, Blocked
+              FIX 2: Smaller (20px), no frosted glass, subtle border
+              FIX 5: Sparklines on Spend & Revenue
+              ────────────────────────────────────────────────────── */}
+          <Section delay={140} className="mb-10">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Spend */}
+              <div
+                onClick={() => router.push("/mcc/buying")}
+                className="
+                  rounded-2xl border border-[var(--border)]
+                  px-4 py-3.5 cursor-pointer
+                  transition-colors duration-200 hover:bg-white/30 dark:hover:bg-white/[0.03]
+                "
+              >
+                <span className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]" title="Total ad spend across all campaigns">{t("summary.totalSpend")}</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="font-bold tabular-nums text-[var(--foreground)]" style={{ fontSize: "1.25rem", lineHeight: 1.2 }}>
+                    {totals ? fmt(totals.totalSpend) : "\u2014"}
+                  </span>
+                  <Sparkline data={spendSpark} />
+                </div>
+                {spendDelta && (
+                  <span className="text-[11px] text-[var(--muted-foreground)]">{spendDelta.pct} vs prev</span>
+                )}
+              </div>
+
+              {/* Revenue */}
+              <div
+                onClick={() => router.push("/mcc/buying")}
+                className="
+                  rounded-2xl border border-[var(--border)]
+                  px-4 py-3.5 cursor-pointer
+                  transition-colors duration-200 hover:bg-white/30 dark:hover:bg-white/[0.03]
+                "
+              >
+                <span className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]" title="Total revenue from conversions">{t("summary.revenue")}</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="font-bold tabular-nums text-[var(--foreground)]" style={{ fontSize: "1.25rem", lineHeight: 1.2 }}>
+                    {totals ? fmt(totals.totalRevenue) : "\u2014"}
+                  </span>
+                  <Sparkline data={revenueSpark} />
+                </div>
+                {revDelta && (
+                  <span className="text-[11px] text-[var(--muted-foreground)]">{revDelta.pct} vs prev</span>
+                )}
+              </div>
+
+              {/* Bugs */}
+              <div
+                onClick={() => router.push("/mcc/engineering")}
+                className="
+                  rounded-2xl border border-[var(--border)]
+                  px-4 py-3.5 cursor-pointer
+                  transition-colors duration-200 hover:bg-white/30 dark:hover:bg-white/[0.03]
+                "
+              >
+                <span className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]" title="Bug issues / total issues in last 90 days. Target: <20%">{t("eng.bugDensity")}</span>
+                <div className="mt-1">
+                  <span className="font-bold tabular-nums" style={{ fontSize: "1.25rem", lineHeight: 1.2, color: statusColor(bugStatus) }}>
+                    {engBugDensity != null ? pct(engBugDensity) : "\u2014"}
+                  </span>
+                </div>
+                <span className="text-[11px] text-[var(--muted-foreground)]">target &lt;30%</span>
+              </div>
+
+              {/* Blocked */}
+              <div
+                onClick={() => router.push("/mcc/engineering")}
+                className="
+                  rounded-2xl border border-[var(--border)]
+                  px-4 py-3.5 cursor-pointer
+                  transition-colors duration-200 hover:bg-white/30 dark:hover:bg-white/[0.03]
+                "
+              >
+                <span className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]" title="Issues in Hold or Blocked status across teams">{t("eng.blocked")}</span>
+                <div className="mt-1">
+                  <span className="font-bold tabular-nums" style={{ fontSize: "1.25rem", lineHeight: 1.2, color: statusColor(blockedStatus) }}>
+                    {engBlocked ?? "\u2014"}
+                  </span>
+                </div>
+                <span className="text-[11px] text-[var(--muted-foreground)]">across teams</span>
+              </div>
+            </div>
+          </Section>
+
+          {/* FIX 1: Engineering error */}
+          {errors.has("Engineering") && (
+            <Section delay={200} className="mb-3">
+              <DataError source="Engineering data" onRetry={reload} />
+            </Section>
+          )}
+
+          {/* ──────────────────────────────────────────────────────
+              SECTION A — ACTIVE FIRES
+              FIX 4: Compressed geo table (top 3 + see all)
+              FIX 5: Progressively more compact
+              ────────────────────────────────────────────────────── */}
+          <Section delay={200} className="mb-8">
+            <SectionHeader label="Active Fires" href="/mcc/buying" />
+            <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mt-3">
+              {/* Geo profit table — bare rows */}
+              <div>
+                {geoRows.map((g, i) => (
+                  <div
+                    key={i}
+                    onClick={() => router.push("/mcc/buying")}
+                    className="
+                      flex items-center justify-between gap-4 px-3 py-2.5 rounded-xl cursor-pointer
+                      transition-colors duration-150 hover:bg-white/30 dark:hover:bg-white/[0.04]
+                    "
+                  >
+                    <span className="text-[13px] font-medium text-[var(--foreground)]">{g.name}</span>
+                    <div className="flex items-center gap-5">
+                      <span
+                        className="text-[14px] font-bold tabular-nums"
+                        style={{ color: g.profit >= 0 ? "var(--success)" : "var(--error)" }}
+                      >
+                        {g.profit >= 0 ? "+" : ""}{fmt(g.profit)}
+                      </span>
+                      <span className="text-[12px] tabular-nums text-[var(--muted-foreground)] min-w-[52px] text-right">
+                        ROI {g.roi}%
+                      </span>
+                    </div>
                   </div>
                 ))}
+                {geoRows.length === 0 && (
+                  <p className="text-[12px] text-[var(--muted-foreground)] px-3 py-4">No geo data available</p>
+                )}
+                {(buyers?.buyers ?? []).length > 3 && (
+                  <div
+                    className="px-3 py-2 cursor-pointer text-[12px] font-medium text-[var(--accent)] hover:underline"
+                    onClick={() => router.push("/mcc/buying")}
+                  >
+                    See all {(buyers?.buyers ?? []).length} geos →
+                  </div>
+                )}
               </div>
-              <div
-                className="mt-3 pt-3 text-[12px] font-bold"
-                style={{ color: "var(--error)", borderTop: "1px solid oklch(0.62 0.22 25 / 0.15)" }}
-              >
-                Monthly burn: {fmt(stopBuyers.reduce((s, b) => s + Math.abs(b.profit), 0))}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 px-4 py-6 rounded-2xl bg-[var(--success-muted)]">
-              <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "var(--success)" }} />
-              <span className="text-[13px]" style={{ color: "var(--success)" }}>No STOP signals</span>
-            </div>
-          )}
-        </div>
-      </Section>
 
-      {/* ──────────────────────────────────────────────────────
-          SECTION B — ENGINEERING PULSE
-          ────────────────────────────────────────────────────── */}
-      <Section delay={260} className="mb-10">
-        <p className="text-section-header mb-4">Engineering Pulse</p>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Sprint progress — two thin bars */}
-          <div>
-            <div className="flex flex-col gap-4">
-              {asdSprint && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[12px] font-medium text-[var(--foreground)]">ASD</span>
-                    <span
-                      className="text-[12px] font-bold tabular-nums"
-                      style={{ color: statusColor(asdSprint.velocity >= 75 ? "ok" : asdSprint.velocity >= 30 ? "watch" : "stop") }}
-                    >
-                      {asdSprint.velocity}%
-                    </span>
+              {/* STOP signals — tinted area */}
+              {stopBuyers.length > 0 ? (
+                <div className="rounded-2xl bg-[var(--error-muted)] p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Ban className="h-3.5 w-3.5" style={{ color: "var(--error)" }} />
+                    <p className="text-caption" style={{ color: "var(--error)" }}>STOP Signals</p>
                   </div>
-                  <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{
-                        width: `${Math.min(asdSprint.velocity, 100)}%`,
-                        background: asdSprint.velocity >= 75 ? "var(--success)" : asdSprint.velocity >= 30 ? "var(--warning)" : "var(--error)",
-                      }}
-                    />
+                  <div className="flex flex-col gap-1">
+                    {stopBuyers.map((sb, i) => (
+                      <div key={i} className="flex items-center justify-between py-1">
+                        <span className="text-[13px] font-medium" style={{ color: "var(--error)" }}>{sb.buyer}</span>
+                        <span className="text-[13px] font-bold tabular-nums" style={{ color: "var(--error)" }}>{fmt(sb.profit)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)] mt-1">{asdSprint.name}</p>
+                  <div
+                    className="mt-2 pt-2 text-[12px] font-bold"
+                    style={{ color: "var(--error)", borderTop: "1px solid oklch(0.62 0.22 25 / 0.15)" }}
+                  >
+                    Monthly burn: {fmt(stopBuyers.reduce((s, b) => s + Math.abs(b.profit), 0))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-4 rounded-2xl bg-[var(--success-muted)]">
+                  <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "var(--success)" }} />
+                  <span className="text-[13px]" style={{ color: "var(--success)" }}>No STOP signals</span>
                 </div>
               )}
-              {fsSprint && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[12px] font-medium text-[var(--foreground)]">FS</span>
-                    <span
-                      className="text-[12px] font-bold tabular-nums"
-                      style={{ color: statusColor(fsSprint.velocity >= 75 ? "ok" : fsSprint.velocity >= 30 ? "watch" : "stop") }}
-                    >
-                      {fsSprint.velocity}%
-                    </span>
-                  </div>
-                  <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{
-                        width: `${Math.min(fsSprint.velocity, 100)}%`,
-                        background: fsSprint.velocity >= 75 ? "var(--success)" : fsSprint.velocity >= 30 ? "var(--warning)" : "var(--error)",
-                      }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)] mt-1">{fsSprint.name}</p>
-                </div>
-              )}
-              {!asdSprint && !fsSprint && (
-                <p className="text-[12px] text-[var(--muted-foreground)]">No sprint data</p>
-              )}
             </div>
-          </div>
+          </Section>
 
-          {/* Top bottleneck people — avatar initials + bar + count */}
-          <div>
-            <div className="flex flex-col gap-3">
-              {bottlenecks.map((b, i) => {
-                const countStatus: Status = b.count >= 7 ? "stop" : b.count >= 4 ? "watch" : "ok"
-                return (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full bg-[var(--muted)] flex items-center justify-center shrink-0">
-                      <span className="text-[9px] font-bold text-[var(--muted-foreground)]">{b.initials}</span>
+          {/* ──────────────────────────────────────────────────────
+              SECTION B — ENGINEERING PULSE
+              FIX 4: Compressed — sprint bars + bottlenecks side by side
+              FIX 5: More compact as we scroll down
+              ────────────────────────────────────────────────────── */}
+          <Section delay={260} className="mb-8">
+            <SectionHeader label="Engineering Pulse" href="/mcc/engineering" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
+              {/* Sprint progress — two thin bars */}
+              <div className="flex flex-col gap-3">
+                {asdSprint && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-medium text-[var(--foreground)]">ASD</span>
+                      <span
+                        className="text-[12px] font-bold tabular-nums"
+                        style={{ color: statusColor(asdSprint.velocity >= 75 ? "ok" : asdSprint.velocity >= 30 ? "watch" : "stop") }}
+                      >
+                        {asdSprint.velocity}%
+                      </span>
                     </div>
-                    <span className="text-[12px] text-[var(--foreground)] min-w-[72px]">{b.name}</span>
-                    <div className="flex-1 h-1 bg-[var(--muted)] rounded-full overflow-hidden">
+                    <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full transition-all duration-700"
                         style={{
-                          width: `${(b.count / maxWip) * 100}%`,
-                          background: statusColor(countStatus),
+                          width: `${Math.min(asdSprint.velocity, 100)}%`,
+                          background: asdSprint.velocity >= 75 ? "var(--success)" : asdSprint.velocity >= 30 ? "var(--warning)" : "var(--error)",
                         }}
                       />
                     </div>
-                    <span
-                      className="text-[13px] font-bold tabular-nums min-w-[24px] text-right"
-                      style={{ color: statusColor(countStatus) }}
-                    >
-                      {b.count}
+                    <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{asdSprint.name}</p>
+                  </div>
+                )}
+                {fsSprint && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-medium text-[var(--foreground)]">FS</span>
+                      <span
+                        className="text-[12px] font-bold tabular-nums"
+                        style={{ color: statusColor(fsSprint.velocity >= 75 ? "ok" : fsSprint.velocity >= 30 ? "watch" : "stop") }}
+                      >
+                        {fsSprint.velocity}%
+                      </span>
+                    </div>
+                    <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${Math.min(fsSprint.velocity, 100)}%`,
+                          background: fsSprint.velocity >= 75 ? "var(--success)" : fsSprint.velocity >= 30 ? "var(--warning)" : "var(--error)",
+                        }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{fsSprint.name}</p>
+                  </div>
+                )}
+                {!asdSprint && !fsSprint && (
+                  <p className="text-[12px] text-[var(--muted-foreground)]">No sprint data</p>
+                )}
+              </div>
+
+              {/* Top bottleneck people — avatar initials + bar + count */}
+              <div className="flex flex-col gap-2.5">
+                {bottlenecks.map((b, i) => {
+                  const countStatus: Status = b.count >= 7 ? "stop" : b.count >= 4 ? "watch" : "ok"
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-[var(--muted)] flex items-center justify-center shrink-0">
+                        <span className="text-[9px] font-bold text-[var(--muted-foreground)]">{b.initials}</span>
+                      </div>
+                      <span className="text-[12px] text-[var(--foreground)] min-w-[72px]">{b.name}</span>
+                      <div className="flex-1 h-1 bg-[var(--muted)] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${(b.count / maxWip) * 100}%`,
+                            background: statusColor(countStatus),
+                          }}
+                        />
+                      </div>
+                      <span
+                        className="text-[13px] font-bold tabular-nums min-w-[24px] text-right"
+                        style={{ color: statusColor(countStatus) }}
+                      >
+                        {b.count}
+                      </span>
+                    </div>
+                  )
+                })}
+                {bottlenecks.length === 0 && (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "var(--success)" }} />
+                    <span className="text-[12px] text-[var(--muted-foreground)]">No bottlenecks</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Section>
+
+          {/* ──────────────────────────────────────────────────────
+              SECTION C — PROBLEM TRACKER
+              FIX 4: Limit to 4 chips + "+N more"
+              ────────────────────────────────────────────────────── */}
+          <Section delay={320} className="mb-6">
+            <SectionHeader label={t("summary.activeProblems")} href="/mcc/problems" />
+            <div className="flex gap-2 flex-wrap mt-3">
+              {visibleProblems.map((p) => {
+                const Icon = problemIcons[p.category] ?? AlertTriangle
+                const chipStatusColor =
+                  p.severity === "critical" ? "var(--error)"
+                  : p.severity === "high" ? "var(--warning)"
+                  : "var(--muted-foreground)"
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => router.push("/mcc/problems")}
+                    className="
+                      flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer
+                      bg-[var(--card)] backdrop-blur-xl
+                      border border-white/40 dark:border-white/[0.06]
+                      transition-all duration-200 hover:border-white/70 dark:hover:border-white/[0.12]
+                    "
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--muted-foreground)]" />
+                    <span className="text-[12px] font-semibold text-[var(--foreground)] leading-tight whitespace-nowrap">
+                      {p.title.length > 28 ? p.title.slice(0, 26) + "\u2026" : p.title}
+                    </span>
+                    <span className="text-[10px] font-medium leading-tight" style={{ color: chipStatusColor }}>
+                      {p.status.replace(/_/g, " ")}
                     </span>
                   </div>
                 )
               })}
-              {bottlenecks.length === 0 && (
-                <div className="flex items-center gap-2">
+              {hiddenProblemCount > 0 && (
+                <div
+                  onClick={() => router.push("/mcc/problems")}
+                  className="
+                    flex items-center gap-1 px-3 py-2 rounded-xl cursor-pointer
+                    text-[12px] font-medium text-[var(--accent)] hover:underline
+                  "
+                >
+                  +{hiddenProblemCount} more
+                  <ChevronRight className="h-3 w-3" />
+                </div>
+              )}
+              {activeProblems.length === 0 && (
+                <div className="flex items-center gap-2 px-3 py-3">
                   <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "var(--success)" }} />
-                  <span className="text-[12px] text-[var(--muted-foreground)]">No bottlenecks</span>
+                  <span className="text-[12px] text-[var(--muted-foreground)]">No active problems</span>
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </Section>
+          </Section>
 
-      {/* ──────────────────────────────────────────────────────
-          SECTION C — PROBLEM TRACKER (horizontal chips)
-          ────────────────────────────────────────────────────── */}
-      <Section delay={320} className="mb-10">
-        <p className="text-section-header mb-4">{t("summary.activeProblems")}</p>
-        <div className="flex gap-2.5 flex-wrap">
-          {probs
-            .filter(p => p.status !== "resolved")
-            .slice(0, 10)
-            .map((p) => {
-              const Icon = problemIcons[p.category] ?? AlertTriangle
-              const chipStatusColor =
-                p.severity === "critical" ? "var(--error)"
-                : p.severity === "high" ? "var(--warning)"
-                : "var(--muted-foreground)"
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => router.push("/mcc/problems")}
-                  className="
-                    flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer
-                    bg-[var(--card)] backdrop-blur-xl
-                    border border-white/40 dark:border-white/[0.06]
-                    transition-all duration-200 hover:border-white/70 dark:hover:border-white/[0.12]
-                  "
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--muted-foreground)]" />
-                  <span className="text-[12px] font-semibold text-[var(--foreground)] leading-tight whitespace-nowrap">
-                    {p.title.length > 28 ? p.title.slice(0, 26) + "\u2026" : p.title}
-                  </span>
-                  <span className="text-[10px] font-medium leading-tight" style={{ color: chipStatusColor }}>
-                    {p.status.replace(/_/g, " ")}
-                  </span>
-                </div>
-              )
-            })}
-          {probs.filter(p => p.status !== "resolved").length === 0 && (
-            <div className="flex items-center gap-2 px-4 py-3">
-              <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "var(--success)" }} />
-              <span className="text-[12px] text-[var(--muted-foreground)]">No active problems</span>
-            </div>
-          )}
-        </div>
-      </Section>
-
-      {/* ──────────────────────────────────────────────────────
-          SECTION D — INFRASTRUCTURE (single line strip)
-          ────────────────────────────────────────────────────── */}
-      <Section delay={380} className="mb-6">
-        <p className="text-section-header mb-3">Infrastructure</p>
-        <div
-          onClick={() => router.push("/mcc/processes")}
-          className="
-            inline-flex items-center gap-6 px-5 py-3 rounded-xl cursor-pointer
-            bg-[var(--card)] backdrop-blur-xl
-            border border-white/30 dark:border-white/[0.05]
-            transition-colors duration-200 hover:bg-white/50 dark:hover:bg-white/[0.06]
-          "
-        >
-          {[
-            { icon: Server, label: "Tasks", value: infraTasks.length },
-            { icon: Shield, label: "Services", value: infraServices.length },
-            { icon: Users, label: "People", value: peopleCount ?? "\u2014" },
-          ].map((item, i) => {
-            const Icon = item.icon
-            return (
-              <div key={i} className="flex items-center gap-2">
-                {i > 0 && <span className="text-[var(--border)] mr-2">|</span>}
-                <Icon className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
-                <span className="text-[12px] text-[var(--muted-foreground)]">{item.label}:</span>
-                <span className="text-[13px] font-bold tabular-nums text-[var(--foreground)]">{item.value}</span>
-              </div>
-            )
-          })}
-        </div>
-      </Section>
+          {/* FIX 4: Infrastructure section REMOVED from homepage — lives on /mcc/processes */}
+        </>
+      )}
 
       {/* Scale-in keyframe (injected once) */}
       <style>{`
