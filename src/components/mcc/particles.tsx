@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 interface Particle {
   x: number
@@ -14,6 +14,24 @@ interface Particle {
 
 export function Particles() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const speedRef = useRef<"calm" | "alert" | "urgent">("calm")
+
+  /* Observe body[data-health] to derive speed */
+  useEffect(() => {
+    const map: Record<string, "calm" | "alert" | "urgent"> = {
+      healthy: "calm",
+      warning: "alert",
+      critical: "urgent",
+    }
+    const sync = () => {
+      const h = document.body.dataset.health || "healthy"
+      speedRef.current = map[h] || "calm"
+    }
+    sync()
+    const observer = new MutationObserver(sync)
+    observer.observe(document.body, { attributes: true, attributeFilter: ["data-health"] })
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -21,9 +39,32 @@ export function Particles() {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
+    /* Respect prefers-reduced-motion */
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
+    let reducedMotion = motionQuery.matches
+    const onMotionChange = (e: MediaQueryListEvent) => { reducedMotion = e.matches }
+    motionQuery.addEventListener("change", onMotionChange)
+
     let animId: number
     let particles: Particle[] = []
     const isDark = () => document.documentElement.classList.contains("dark")
+
+    const velocityFor = (speed: "calm" | "alert" | "urgent") => {
+      if (speed === "urgent") return 0.9
+      if (speed === "alert") return 0.6
+      return 0.4
+    }
+
+    const connectionDistFor = (speed: "calm" | "alert" | "urgent") => {
+      if (speed === "urgent") return 180
+      return 150
+    }
+
+    const countMultiplier = (speed: "calm" | "alert" | "urgent") => {
+      if (speed === "urgent") return 1.3
+      if (speed === "alert") return 1.15
+      return 1
+    }
 
     const resize = () => {
       canvas.width = canvas.offsetWidth * window.devicePixelRatio
@@ -33,12 +74,14 @@ export function Particles() {
 
     const init = () => {
       resize()
-      const count = Math.floor((canvas.offsetWidth * canvas.offsetHeight) / 12000)
-      particles = Array.from({ length: Math.min(count, 80) }, () => ({
+      const baseCount = Math.floor((canvas.offsetWidth * canvas.offsetHeight) / 12000)
+      const count = Math.min(Math.floor(baseCount * countMultiplier(speedRef.current)), 100)
+      const vel = velocityFor(speedRef.current)
+      particles = Array.from({ length: count }, () => ({
         x: Math.random() * canvas.offsetWidth,
         y: Math.random() * canvas.offsetHeight,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
+        vx: (Math.random() - 0.5) * vel,
+        vy: (Math.random() - 0.5) * vel,
         size: Math.random() * 3 + 1,
         opacity: Math.random() * 0.4 + 0.1,
         hue: 220 + Math.random() * 80,
@@ -46,13 +89,31 @@ export function Particles() {
     }
 
     const draw = () => {
+      if (reducedMotion) {
+        /* Static fallback: draw once and stop */
+        drawFrame()
+        return
+      }
+      drawFrame()
+      animId = requestAnimationFrame(draw)
+    }
+
+    const drawFrame = () => {
       const w = canvas.offsetWidth
       const h = canvas.offsetHeight
       ctx.clearRect(0, 0, w, h)
 
       const dark = isDark()
+      const speed = speedRef.current
+      const vel = velocityFor(speed)
+      const connDist = connectionDistFor(speed)
 
       for (const p of particles) {
+        /* Smoothly adjust velocity toward target */
+        const targetVx = Math.sign(p.vx) * vel * (Math.abs(p.vx) / (vel || 0.4))
+        p.vx += (targetVx - p.vx) * 0.01
+        p.vy += ((Math.sign(p.vy) * vel * (Math.abs(p.vy) / (vel || 0.4))) - p.vy) * 0.01
+
         p.x += p.vx
         p.y += p.vy
 
@@ -61,7 +122,6 @@ export function Particles() {
         if (p.y < 0) p.y = h
         if (p.y > h) p.y = 0
 
-        // Particle dot
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
         ctx.fillStyle = dark
@@ -76,8 +136,8 @@ export function Particles() {
           const dx = particles[i].x - particles[j].x
           const dy = particles[i].y - particles[j].y
           const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 150) {
-            const alpha = (1 - dist / 150) * 0.12
+          if (dist < connDist) {
+            const alpha = (1 - dist / connDist) * 0.12
             ctx.beginPath()
             ctx.moveTo(particles[i].x, particles[i].y)
             ctx.lineTo(particles[j].x, particles[j].y)
@@ -89,18 +149,18 @@ export function Particles() {
           }
         }
       }
-
-      animId = requestAnimationFrame(draw)
     }
 
     init()
     draw()
 
-    window.addEventListener("resize", () => { resize(); init() })
+    const onResize = () => { resize(); init() }
+    window.addEventListener("resize", onResize)
 
     return () => {
       cancelAnimationFrame(animId)
-      window.removeEventListener("resize", resize)
+      window.removeEventListener("resize", onResize)
+      motionQuery.removeEventListener("change", onMotionChange)
     }
   }, [])
 

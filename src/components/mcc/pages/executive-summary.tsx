@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/mcc/page-header"
 import { useI18n } from "@/lib/mcc-i18n"
@@ -93,6 +93,42 @@ type Status = "ok" | "watch" | "stop" | "neutral"
 
 function statusColor(s: Status): string {
   return { ok: "var(--success)", watch: "var(--warning)", stop: "var(--error)", neutral: "var(--foreground)" }[s]
+}
+
+/* ─── AnimatedNumber — rolls up/down when values change ────── */
+function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
+  const [displayed, setDisplayed] = useState(value)
+  const [animating, setAnimating] = useState(false)
+  const reducedMotion = useRef(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
+    reducedMotion.current = mq.matches
+    const handler = (e: MediaQueryListEvent) => { reducedMotion.current = e.matches }
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
+
+  useEffect(() => {
+    if (value === displayed) return
+    if (reducedMotion.current) { setDisplayed(value); return }
+    setAnimating(true)
+    const start = displayed
+    const diff = value - start
+    const duration = 600
+    const startTime = performance.now()
+
+    function tick(now: number) {
+      const t = Math.min((now - startTime) / duration, 1)
+      const eased = 1 - Math.pow(1 - t, 4) // ease-out-quart
+      setDisplayed(Math.round(start + diff * eased))
+      if (t < 1) requestAnimationFrame(tick)
+      else setAnimating(false)
+    }
+    requestAnimationFrame(tick)
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return <span className={animating ? "transition-colors" : ""}>{prefix}{displayed.toLocaleString()}{suffix}</span>
 }
 
 /* Mini sparkline — for money KPIs with daily trend data */
@@ -293,6 +329,31 @@ export function ExecutiveSummary() {
   const bugStatus: Status = engBugDensity != null ? (engBugDensity <= 30 ? "ok" : engBugDensity <= 45 ? "watch" : "stop") : "neutral"
   const blockedStatus: Status = engBlocked != null ? (engBlocked === 0 ? "ok" : engBlocked <= 5 ? "watch" : "stop") : "neutral"
 
+  /* ─── Ambient health — drives orb color + particle speed ──── */
+  const computeHealth = (): "healthy" | "warning" | "critical" => {
+    const issues: number[] = []
+    if (totals) {
+      if (totals.avgRoi < 0) issues.push(3)       // critical: losing money
+      else if (totals.avgRoi < 10) issues.push(2)  // warning: low ROI
+      const stopCount = (buyers?.buyers ?? []).filter(b => b.signal === "STOP").length
+      if (stopCount >= 3) issues.push(2)           // warning: multiple STOPs
+    }
+    if (engData) {
+      if (engData.summary.totalVelocity < 30) issues.push(2)  // warning: very low velocity
+      if (engData.summary.avgBugDensity > 45) issues.push(2)  // warning: high bugs
+    }
+    if (errors.size >= 2) issues.push(3) // critical: multiple data sources down
+    const maxSeverity = Math.max(0, ...issues)
+    if (maxSeverity >= 3) return "critical"
+    if (maxSeverity >= 2) return "warning"
+    return "healthy"
+  }
+
+  useEffect(() => {
+    document.body.dataset.health = computeHealth()
+    return () => { delete document.body.dataset.health }
+  }, [totals, engData, errors]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* FIX 4: Geo profit rows — top 3 (compressed) */
   const geoRows = (buyers?.buyers ?? [])
     .sort((a, b) => b.profit - a.profit)
@@ -399,7 +460,13 @@ export function ExecutiveSummary() {
               ────────────────────────────────────────────────────── */}
           {(insights.length > 0 || recommendation) && (
             <Section delay={0} className="mb-6">
-              <div className={`rounded-xl px-5 py-4 ${insightBg}`} style={{ borderTop: "2px solid var(--border)" }}>
+              <div
+                className={`rounded-xl px-5 py-4 ${insightBg}`}
+                style={{
+                  borderTop: "2px solid var(--border)",
+                  animation: worstInsight?.level === "critical" ? "subtle-pulse 4s ease-in-out infinite" : undefined,
+                }}
+              >
                 {insights.map((ins, i) => {
                   const iconColor = ins.level === "critical" ? "var(--error)" : ins.level === "warning" ? "var(--warning)" : "var(--success)"
                   return (
@@ -507,7 +574,7 @@ export function ExecutiveSummary() {
                 <span className="text-caption" title="Campaigns with ROI below -30%. Losing money.">STOP</span>
                 <div className="mt-2">
                   <span className="font-bold tabular-nums" style={{ fontSize: "1.75rem", lineHeight: 1, color: statusColor(stopStatus) }}>
-                    {stopBuyers.length}
+                    <AnimatedNumber value={stopBuyers.length} />
                   </span>
                 </div>
                 <p className="text-body-sm text-[var(--muted-foreground)] mt-2">
@@ -622,7 +689,7 @@ export function ExecutiveSummary() {
                 <span className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]" title="Issues in Hold or Blocked status across teams">{t("eng.blocked")}</span>
                 <div className="mt-1">
                   <span className="font-bold tabular-nums" style={{ fontSize: "1.25rem", lineHeight: 1.2, color: statusColor(blockedStatus) }}>
-                    {engBlocked ?? "\u2014"}
+                    {engBlocked != null ? <AnimatedNumber value={engBlocked} /> : "\u2014"}
                   </span>
                 </div>
                 <span className="text-[11px] text-[var(--muted-foreground)]">across teams</span>
@@ -872,11 +939,21 @@ export function ExecutiveSummary() {
         </>
       )}
 
-      {/* Scale-in keyframe (injected once) */}
+      {/* Keyframes (injected once) */}
       <style>{`
         @keyframes scale-in {
           from { transform: scale(0.97); opacity: 0.8; }
           to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes subtle-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.85; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-fade-in-up,
+          [style*="subtle-pulse"] {
+            animation: none !important;
+          }
         }
       `}</style>
     </>

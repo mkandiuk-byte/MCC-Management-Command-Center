@@ -106,6 +106,54 @@ function stageBorderColor(count: number | undefined): string {
   return "var(--border)"
 }
 
+/* -- Stage tooltip descriptions ------------------------------------ */
+
+const stageDescriptions: Record<string, string> = {
+  "Open":            "New task queued for sprint planning. Owner: Product Owner.",
+  "To Do":           "New task queued for sprint planning. Owner: Product Owner.",
+  "Backlog":         "Groomed but not yet scheduled. Will be pulled into a sprint.",
+  "In Progress":     "Developer actively working on this task.",
+  "Code Review":     "Pull request submitted. Peer reviewing code. SLA: 3 days.",
+  "In Review":       "Product/design review of completed work.",
+  "QA":              "Quality assurance testing. SLA: 2 days.",
+  "QA in Testing":   "Quality assurance testing. SLA: 2 days.",
+  "Ready to Stage":  "Passed QA, waiting for deployment to staging. SLA: 1 day.",
+  "Staging":         "Passed QA, waiting for deployment to staging. SLA: 1 day.",
+  "RC":              "Released to production.",
+  "Done":            "Released to production.",
+  "Closed":          "Released to production.",
+  "Design":          "UI/UX design phase (FS team only).",
+  "Queued":          "Combined: Reopened + Hold + Backlog items waiting for attention.",
+  // Media buying stages
+  "Hypothesis":      "Campaign hypothesis formed. Testing thesis defined.",
+  "Creative":        "Ad creative in production.",
+  "Account Setup":   "Ad accounts and pixels being configured.",
+  "Launch":          "Campaign going live.",
+  "Monitor":         "Campaign live and being monitored.",
+  "Optimize/Kill":   "Decision point: scale up or kill.",
+  // Analytics stages
+  "Request":         "Report request received from stakeholder.",
+  "Queue":           "Report queued for analyst.",
+  "Analysis":        "Analyst actively working on report.",
+  "Review":          "Report under peer/stakeholder review.",
+  "Delivery":        "Report delivered to requester.",
+  // Infra stages
+  "Planned":         "Task planned for upcoming sprint.",
+}
+
+/* -- Status Dot ---------------------------------------------------- */
+
+function StatusDot({ count }: { count: number | undefined }) {
+  if (count === undefined) return null
+  const color = count <= 5 ? "var(--success)" : count <= 10 ? "var(--warning)" : "var(--error)"
+  return (
+    <span
+      className="inline-block w-[6px] h-[6px] rounded-full shrink-0"
+      style={{ backgroundColor: color }}
+    />
+  )
+}
+
 /* -- Build sections with live data --------------------------------- */
 
 function buildSections(engData: EngineeringApiData | null): ProcessSection[] {
@@ -293,32 +341,42 @@ function Pipeline({ stages, label }: { stages: PipelineStage[]; label?: string }
     <div className="space-y-2">
       {label && <p className="text-[12px] font-medium text-[var(--muted-foreground)]">{label}</p>}
       <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin min-w-fit">
-        {stages.map((stage, i) => (
-          <div key={stage.name} className="flex items-center shrink-0">
-            <div
-              className="flex flex-col items-center justify-center rounded-lg px-3 py-2.5 min-w-[90px] border"
-              style={{
-                backgroundColor: stageBgColor(stage.count),
-                borderColor: stageBorderColor(stage.count),
-              }}
-            >
-              <span className="text-[11px] font-medium text-[var(--secondary-foreground)] text-center leading-tight whitespace-nowrap">
-                {stage.name}
-              </span>
-              {stage.count !== undefined && (
-                <span
-                  className="text-[14px] font-bold mt-0.5"
-                  style={{ color: stageColor(stage.count) }}
-                >
-                  {stage.count}
-                </span>
+        {stages.map((stage, i) => {
+          const isBottleneck = (stage.count ?? 0) > 10
+          const tooltip = stageDescriptions[stage.name] || stage.name
+          return (
+            <div key={stage.name} className="flex items-center shrink-0">
+              <div
+                className="flex flex-col items-center justify-center rounded-lg px-3 py-2.5 min-w-[90px] border"
+                title={tooltip}
+                style={{
+                  backgroundColor: isBottleneck ? "var(--error-muted)" : stageBgColor(stage.count),
+                  borderColor: stageBorderColor(stage.count),
+                  transition: "background 0.5s ease",
+                  animation: isBottleneck ? "bottleneck-pulse 3s ease-in-out infinite" : undefined,
+                }}
+              >
+                <div className="flex items-center gap-1">
+                  <StatusDot count={stage.count} />
+                  <span className="text-[11px] font-medium text-[var(--secondary-foreground)] text-center leading-tight whitespace-nowrap">
+                    {stage.name}
+                  </span>
+                </div>
+                {stage.count !== undefined && (
+                  <span
+                    className="text-[14px] font-bold mt-0.5"
+                    style={{ color: stageColor(stage.count) }}
+                  >
+                    {stage.count}
+                  </span>
+                )}
+              </div>
+              {i < stages.length - 1 && (
+                <span className="text-[var(--muted-foreground)] text-[16px] mx-0.5 shrink-0">&rarr;</span>
               )}
             </div>
-            {i < stages.length - 1 && (
-              <span className="text-[var(--muted-foreground)] text-[16px] mx-0.5 shrink-0">&rarr;</span>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -490,6 +548,16 @@ interface PeopleApiData {
   teams: { name: string; memberCount: number }[]
 }
 
+/* -- Chart color palette ------------------------------------------- */
+
+const chartColors = [
+  "var(--chart-1, oklch(0.65 0.18 250))",
+  "var(--chart-2, oklch(0.65 0.18 155))",
+  "var(--chart-3, oklch(0.65 0.18 30))",
+  "var(--chart-4, oklch(0.65 0.18 320))",
+  "var(--chart-5, oklch(0.65 0.18 60))",
+]
+
 /* -- People & Organization Section --------------------------------- */
 
 function PeopleSection({ data }: { data: PeopleApiData | null }) {
@@ -507,6 +575,7 @@ function PeopleSection({ data }: { data: PeopleApiData | null }) {
   const { summary, teams } = data
   const departments = Object.entries(summary.byDepartment).sort((a, b) => b[1] - a[1])
   const maxDeptCount = departments.length > 0 ? departments[0][1] : 1
+  const totalPeople = summary.total
 
   return (
     <Card>
@@ -515,6 +584,43 @@ function PeopleSection({ data }: { data: PeopleApiData | null }) {
           <Users className="h-4 w-4 text-[var(--muted-foreground)]" />
           <h3 className="text-[15px] font-semibold text-[var(--foreground)]">People & Organization</h3>
         </div>
+
+        {/* Total Headcount — large prominent number */}
+        <div className="flex items-baseline gap-3">
+          <span className="text-[2.5rem] font-bold tabular-nums text-[var(--foreground)] leading-none">
+            {totalPeople}
+          </span>
+          <span className="text-[13px] text-[var(--muted-foreground)]">total headcount</span>
+        </div>
+
+        {/* Proportional stacked bar */}
+        {departments.length > 0 && (
+          <div>
+            <div className="flex h-3 rounded-full overflow-hidden">
+              {departments.map(([dept, count], index) => (
+                <div
+                  key={dept}
+                  style={{
+                    width: `${(count / totalPeople) * 100}%`,
+                    background: chartColors[index % chartColors.length],
+                  }}
+                  title={`${dept}: ${count}`}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+              {departments.map(([dept, count], index) => (
+                <div key={dept} className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full shrink-0"
+                    style={{ background: chartColors[index % chartColors.length] }}
+                  />
+                  <span className="text-[11px] text-[var(--muted-foreground)]">{dept} ({count})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -668,11 +774,22 @@ function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null 
             <ShieldCheck className="h-4 w-4 text-[var(--muted-foreground)]" />
             <h3 className="text-[15px] font-semibold text-[var(--foreground)]">SLA Compliance</h3>
           </div>
-          <ScoreBox
-            label="Overall Compliance"
-            value={`${complianceRate}%`}
-            status={complianceStatus}
-          />
+          {/* Prominent compliance percentage */}
+          <div className="flex items-baseline gap-2">
+            <span
+              className="text-[2rem] font-bold tabular-nums leading-none"
+              style={{
+                color: complianceRate > 80
+                  ? "var(--success)"
+                  : complianceRate >= 50
+                    ? "var(--warning)"
+                    : "var(--error)",
+              }}
+            >
+              {complianceRate}%
+            </span>
+            <span className="text-[11px] text-[var(--muted-foreground)]">SLA Compliance</span>
+          </div>
         </div>
 
         <p className="text-[11px] text-[var(--muted-foreground)]">
@@ -685,6 +802,7 @@ function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null 
             <div
               key={entry.stage}
               className="flex flex-col items-center justify-center rounded-lg px-3 py-3 border"
+              title={stageDescriptions[entry.stage] || entry.stage}
               style={{
                 backgroundColor: slaBgColor(entry.status),
                 borderColor: slaBorderColor(entry.status),
@@ -701,6 +819,9 @@ function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null 
               </span>
               <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
                 SLA: {formatSlaHours(entry.targetHours)}
+              </span>
+              <span className="text-[9px] text-[var(--muted-foreground)] mt-0.5 italic">
+                measuring...
               </span>
             </div>
           ))}
@@ -723,6 +844,22 @@ function SlaComplianceSection({ engData }: { engData: EngineeringApiData | null 
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+/* -- Department Flow Narrative ------------------------------------- */
+
+function DepartmentFlowNarrative() {
+  return (
+    <div className="flex items-center gap-3 text-[13px] text-[var(--muted-foreground)] mb-8 flex-wrap">
+      <span className="font-semibold text-[var(--foreground)]">Media Buying</span>
+      <span>runs campaigns &rarr;</span>
+      <span className="font-semibold text-[var(--foreground)]">Engineering</span>
+      <span>builds tools &rarr;</span>
+      <span className="font-semibold text-[var(--foreground)]">Analytics</span>
+      <span>measures impact &rarr;</span>
+      <span>cycle repeats</span>
+    </div>
   )
 }
 
@@ -769,6 +906,9 @@ export function ProcessesPage() {
 
       <InsightsCard insights={insights} className="mb-8" />
 
+      {/* Department connection narrative */}
+      <DepartmentFlowNarrative />
+
       <div className="space-y-6">
         {sections.map((s) => (
           <SectionCard key={s.department} section={s} />
@@ -777,6 +917,19 @@ export function ProcessesPage() {
         <InfrastructureSection data={infraData} />
         <PeopleSection data={peopleData} />
       </div>
+
+      {/* Bottleneck pulse animation */}
+      <style>{`
+        @keyframes bottleneck-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.88; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [style*="bottleneck-pulse"] {
+            animation: none !important;
+          }
+        }
+      `}</style>
     </>
   )
 }
